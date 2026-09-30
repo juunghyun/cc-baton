@@ -17,6 +17,17 @@ jobs:
       - name: Tests
         run: uv run --python 3.12 --group dev python -m pytest tests -q
 
+  # 새 Mac 사용자처럼: README 설치 → 첫 실행 위저드 → HUD → 제거. PATH 는 macOS 기본값만 (Homebrew 도구 없이).
+  install:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fresh install end to end
+        run: >
+          env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin:/usr/sbin:/sbin SHELL=/bin/zsh
+          LANG=en_US.UTF-8 TERM=xterm-256color REPO="$GITHUB_WORKSPACE"
+          /bin/zsh tests/e2e/fresh-install.sh
+
   secrets:
     runs-on: ubuntu-latest
     steps:

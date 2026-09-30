@@ -329,13 +329,20 @@ def cmd_install(argv):
 
 # ── setup (첫 실행 위저드) ─────────────────────────────────────────────────
 class Tty:
+    """사람에게 묻는 창구. /dev/tty 가 안 열리는 환경(일부 CI 가상 터미널)은 표준 입출력이 터미널이면 그걸 쓴다."""
+
     def __init__(self):
-        self.f = open("/dev/tty", "r+")
+        try:
+            self.f = self.r = open("/dev/tty", "r+")
+        except OSError:
+            if not (sys.stdin.isatty() and sys.stderr.isatty()):
+                raise
+            self.f, self.r = sys.stderr, sys.stdin
 
     def ask(self, prompt, default=""):
         self.f.write(prompt)
         self.f.flush()
-        ans = self.f.readline()
+        ans = self.r.readline()
         if not ans:
             raise EOFError
         return ans.strip() or default

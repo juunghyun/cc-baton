@@ -77,8 +77,13 @@ def test_branch_drops_login_name_and_shortens_type(home):
     subprocess.run([*git, "init", "-q", "-b", "feature/tester_proj-1_login"], check=True)
     subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "x"], check=True)
     data = {"model": {"display_name": "Opus 5.5"}, "workspace": {"current_dir": str(repo)}}
-    r = home.run("statusline", input=json.dumps(data))
-    assert "(ft/proj-1_login)" in plain(r.stdout.split("\n")[0])
+    # HUD 는 git 을 0.4초까지만 기다린다(느리면 브랜치를 건너뛴다). 느린 CI 에선 첫 git 호출이 그보다 길어서 몇 번 준다.
+    subprocess.run([*git, "status", "-s"], capture_output=True)
+    for _ in range(3):
+        line1 = plain(home.run("statusline", input=json.dumps(data)).stdout.split("\n")[0])
+        if "(" in line1:
+            break
+    assert "(ft/proj-1_login)" in line1
 
 
 def test_free_form_groups_and_colors(home):

@@ -4,7 +4,7 @@
 
 # cc-baton
 
-**Switch Claude Code accounts mid-task. Keep every word of the conversation.**
+**Move a Claude Code conversation between your own accounts. Keep every word of it.**
 
 [![CI](https://github.com/juunghyun/cc-baton/actions/workflows/ci.yml/badge.svg)](https://github.com/juunghyun/cc-baton/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8250DF?style=flat-square)](LICENSE)
@@ -14,7 +14,7 @@ English | [한국어](README.ko.md)
 
 </div>
 
-You hit the 5-hour limit halfway through a refactor. Type `/swap personal`, press Ctrl+D, and the same conversation continues on your other account, transcript and all. A statusline HUD shows which account you're on and how much each one has left.
+Your team seat and your personal plan are separate Claude accounts, and a conversation normally stays in the one it started in. Type `/swap personal`, press Ctrl+D, and the same conversation continues on your other account, transcript and all. A statusline HUD shows which account you're on, so work doesn't end up on the wrong one.
 
 ![Swapping accounts in Claude Code: the conversation continues on the other account](docs/demo-swap.gif)
 
@@ -40,7 +40,7 @@ Run exactly the two lines above (skip the first if `uv --version` works). Don't 
 
 **The whole conversation moves, not a summary.** The transcript file itself is copied to the other account and resumed there, along with its large tool outputs and subagent logs. Your other conversations stay where they were.
 
-**Always know which account you're on.** Three lines under the prompt show the account and its group, the usage left on every account, and which features are on.
+**Always know which account you're on.** Three lines under the prompt show the account and its group, each account's usage, and which features are on.
 
 ![What each part of the HUD means](docs/assets/hud.png)
 
@@ -48,7 +48,7 @@ Run exactly the two lines above (skip the first if `uv --version` works). Don't 
 
 **Idle tabs stop eating memory.** Optional: a session left idle has its process stopped, and any key brings it back with the conversation intact. `/sleep` does it right away.
 
-**Rate-limit autopilot, if you want it.** Off by default. When on, hitting a limit schedules a swap to an account that still has room.
+**Switch for you when an account runs out.** Optional and off by default. When one of your accounts hits its usage limit, cc-baton schedules a swap to another of your accounts, so pressing Ctrl+D is all it takes.
 
 ## Commands
 
@@ -71,8 +71,10 @@ Removes only what cc-baton added and puts back the statusline you had. Your clau
 
 ## Before you use it
 
-- Whether using several accounts around usage limits fits Anthropic's terms is for you to check.
-- Moving work conversations to a personal account (or the reverse) may be against your company's policy.
+- **Your own accounts only.** Sharing an account or its login with anyone else is not allowed under Anthropic's [Consumer Terms](https://www.anthropic.com/legal/consumer-terms).
+- **Each account keeps its own limits.** cc-baton only changes which of your accounts Claude Code uses; it doesn't raise or reset any limit. Auto-swap is off by default. Read Anthropic's [Usage Policy](https://www.anthropic.com/legal/aup) and [Claude Code terms](https://code.claude.com/docs/en/legal-and-compliance) and decide for yourself before turning it on.
+- **Work accounts follow your company's rules.** Team and Enterprise seats are covered by your organization's agreement. Moving a work conversation to a personal account may be against its policy; the group check asks before doing it.
+- **Your login stays with Claude Code.** cc-baton runs the unmodified Claude Code and never reads or stores your credentials. Switching logins on your machine is done by claude-swap.
 - cc-baton reads claude-swap's state files and parts of Claude Code that aren't official APIs. Tested with macOS 15.3, Claude Code 2.1.285 and claude-swap 0.25–0.26.
 
 ## More
@@ -83,6 +85,6 @@ Development: `uv tool install -e . && cc-baton install` from a clone, tests with
 
 ## Author's note
 
-I switch between a team seat and a personal plan every day. Each time one ran out in the middle of a task, I lost the thread and had to explain everything again. cc-baton is the smallest thing I could build that keeps the thread.
+I work across a team seat and a personal plan every day. Every time a task moved from one account to the other, the conversation stayed behind and I had to explain everything again. cc-baton is the smallest thing I could build that keeps the thread.
 
-cc-baton is an unofficial add-on, not affiliated with Anthropic or claude-swap. MIT licensed.
+cc-baton is an unofficial add-on, not affiliated with or endorsed by Anthropic or claude-swap. Claude and Claude Code are products of Anthropic. MIT licensed.

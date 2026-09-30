@@ -41,10 +41,9 @@ CMD_MARK = "<!-- installed by cc-baton; `cc-baton uninstall` removes this file -
 def our_hooks():
     """우리 훅: (이벤트, 그룹 추가 키, 하위명령, 훅 추가 키). statusMessage 는 Claude Code 화면에 보인다."""
     return [
-        ("UserPromptSubmit", {}, "swap hook prompt",
-         {"timeout": 10, "statusMessage": L("checking /swap", "/swap 확인 중")}),
+        ("UserPromptSubmit", {}, "swap hook prompt", {"timeout": 10}),  # 매 입력마다 돌므로 화면에 띄우지 않는다
         ("StopFailure", {"matcher": "rate_limit"}, "swap hook limit",
-         {"timeout": 10, "statusMessage": L("rate limit reached, scheduling an account swap", "한도 도달 — 계정 스왑 예약 중")}),
+         {"timeout": 10, "statusMessage": L("rate limit reached, scheduling an account swap", "한도 도달, 계정 전환 예약 중")}),
     ]
 
 
@@ -265,11 +264,6 @@ def link_cswap():
     return L("linked", "연결")
 
 
-def claude_is_npm():
-    c = shutil.which("claude")
-    return bool(c) and "node_modules/@anthropic-ai/claude-code" in str(Path(c).resolve())
-
-
 def hib_plist(exe):
     return {
         "Label": st.HIB_LABEL,
@@ -340,14 +334,20 @@ def cmd_install(argv):
     report.append("settings.json: " + (L(f"hooks added ({backup})", f"훅 반영 ({backup})") if backup else L("no change", "변경 없음")))
 
     report += [L(f"command {p.name}: {r}", f"명령 {p.name}: {r}") for p, r in install_commands(exe)]
-    report.append(L(f"~/.zshrc block: {install_zshrc(exe)}", f"~/.zshrc 블록: {install_zshrc(exe)}"))
+    zr = install_zshrc(exe)  # L() 은 두 인자를 다 평가하므로 먼저 한 번만 부른다
+    report.append(L(f"~/.zshrc block: {zr}", f"~/.zshrc 블록: {zr}"))
+    if not os.environ.get("SHELL", "").endswith("zsh"):
+        report.append(YEL + L(f"your login shell is {os.environ.get('SHELL') or '?'}; `baton` is a zsh function, so run it from zsh",
+                              f"로그인 셸이 {os.environ.get('SHELL') or '?'} 입니다. `baton` 은 zsh 함수라 zsh 에서 실행하세요") + R)
     c = link_cswap()
     if c:
         report.append(L(f"cswap command: {c}", f"cswap 명령: {c}"))
 
     cfg = st.config()
     if "autoUpdate" not in cfg:  # npm 으로 깐 Claude Code 만 우리가 올린다. 공식 설치본은 자체 자동 업데이트
-        save_config(autoUpdate={"enabled": claude_is_npm()})
+        save_config(autoUpdate={"enabled": st.claude_is_npm()})
+    if cfg.get("language") not in i18n.LANGS:  # 설치 보고와 위저드, HUD 가 같은 언어를 쓰게 고정
+        save_config(language=i18n.lang())
     if HIB_PLIST.exists():  # 이미 켜 둔 절전만 새 경로로 갱신. 새로 등록은 위저드에서만
         register_hib(exe)
         report.append(L("hibernate launchd agent: updated to the new path", "절전 launchd: 새 경로로 갱신"))
@@ -414,16 +414,16 @@ def _separate_claude_swap():
     return any(line.startswith("claude-swap ") for line in out.splitlines())
 
 
-def _system_language():
-    """macOS 의 선호 언어 첫 번째 (defaults read -g AppleLanguages). 모르면 로캘."""
+def _cswap(*args, interactive=False):
+    """번들 cswap 실행. 탭의 CLAUDE_CONFIG_DIR 를 넘기면 cswap 이 엉뚱한 프로필을 보므로 뺀다.
+    묻지 않는 명령은 입력을 막아 위저드의 다음 답을 가져가지 못하게 한다."""
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CONFIG_DIR"}
     try:
-        out = subprocess.run(["defaults", "read", "-g", "AppleLanguages"], capture_output=True, text=True, timeout=3).stdout
-        first = out.replace("(", "").replace('"', "").split(",")[0].strip().lower()
-        if first:
-            return "ko" if first.startswith("ko") else "en"
-    except Exception:
-        pass
-    return i18n.detect()
+        return subprocess.run([str(st.CSWAP_BIN), *args], env=env, timeout=None if interactive else 30,
+                              stdin=None if interactive else subprocess.DEVNULL,
+                              stdout=None if interactive else subprocess.DEVNULL).returncode
+    except (OSError, subprocess.TimeoutExpired):
+        return 1
 
 
 def cmd_setup(argv):
@@ -440,7 +440,7 @@ def cmd_setup(argv):
     w = lambda msg="": (t.f.write(msg + "\n"), t.f.flush())  # noqa: E731
     try:
         # 0) 언어 (두 언어로 묻는다)
-        cur_lang = cfg.get("language") if cfg.get("language") in i18n.LANGS else _system_language()
+        cur_lang = cfg.get("language") if cfg.get("language") in i18n.LANGS else i18n.detect()
         ans = t.ask(f"\n{BOLD}Language / 언어{R} [en/ko] ({cur_lang}): ", cur_lang).lower()
         chosen = "ko" if ans.startswith(("ko", "k", "한")) else ("en" if ans.startswith(("en", "e")) else cur_lang)
         save_config(language=chosen)
@@ -457,8 +457,14 @@ def cmd_setup(argv):
           + L("— swapping to an account in another group asks you first (e.g. work, personal)",
               "— 그룹이 다른 계정으로 스왑할 땐 한 번 더 확인합니다 (예: work, personal)") + R)
         if not accs:
-            w("  " + L(f"No accounts in claude-swap yet. Register the account you're logged in with: {BOLD}cswap add{R}",
-                       f"claude-swap 에 등록된 계정이 없습니다. 지금 로그인된 계정을 {BOLD}cswap add{R} 로 먼저 등록하세요."))
+            live = st.live_email()
+            if live and t.yes("  " + L(f"No accounts in claude-swap yet. Register {live}, the account you're logged in with, now?",
+                                       f"claude-swap 에 등록된 계정이 없습니다. 지금 로그인된 {live} 를 등록할까요?"), True):
+                _cswap("add", interactive=True)
+                accs = st.accounts()
+            if not accs:
+                w("  " + L(f"Log in to Claude Code (run claude, then /login), then run {BOLD}cswap add{R} and {BOLD}cc-baton setup{R}.",
+                           f"Claude Code 에 로그인(claude 실행 후 /login)한 뒤 {BOLD}cswap add{R}, 그다음 {BOLD}cc-baton setup{R} 을 실행하세요."))
         for a in accs:
             cur = st.group(a["num"])
             shown = "" if cur == "unknown" else cur
@@ -467,6 +473,11 @@ def cmd_setup(argv):
                 entry = cfg.setdefault(a["num"], {})
                 entry["group"] = g.lower()
                 entry.pop("kind", None)
+            if not a["alias"]:  # /swap personal 처럼 부를 이름. 없으면 번호나 이메일로만 부를 수 있다
+                name = t.ask("     " + L("short name for /swap (Enter to skip): ", "/swap 에 쓸 짧은 이름 (엔터면 건너뜀): "), "")
+                if name and _cswap("alias", a["num"], name) != 0:
+                    w("     " + L(f"couldn't set it. Later: cswap alias {a['num']} <name>",
+                                  f"정하지 못했습니다. 나중에: cswap alias {a['num']} <이름>"))
         if len(accs) == 1:
             w("  " + DIM + L("To add another account: log in to it with /login in Claude Code, then run cswap add",
                               "계정을 더 쓰려면: Claude Code 에서 /login 으로 다른 계정에 로그인한 뒤 cswap add") + R)
@@ -568,7 +579,8 @@ def cmd_setup(argv):
                     w("  → " + L("Couldn't remove it. Run: uv tool uninstall claude-swap",
                                  "정리하지 못했습니다. 직접: uv tool uninstall claude-swap"))
 
-        save_config(setup={"done": True, "at": time.time()})
+        if accs:  # 계정이 하나도 없으면 다음 baton 에서 다시 묻는다
+            save_config(setup={"done": True, "at": time.time()})
         _refresh_hook_messages(exe)
         w(f"\n{GRN}✓{R} " + L(f"All set. Change things with {BOLD}cc-baton setup{R}, or one feature with {BOLD}cc-baton toggle{R}",
                               f"설정 끝. 바꾸려면 {BOLD}cc-baton setup{R}, 기능 하나만은 {BOLD}cc-baton toggle{R}") + "\n")
@@ -638,7 +650,7 @@ def cmd_uninstall(argv):
     if link.is_symlink() and bundled.exists() and link.resolve() == bundled.resolve():
         link.unlink()
         if ask(L("Keep using claude-swap (cswap)? It will be installed on its own.",
-                 "claude-swap(cswap) 은 계속 쓰시겠어요? 따로 다시 설치해 둡니다."), False):
+                 "claude-swap(cswap) 은 계속 쓰시겠어요? 따로 다시 설치해 둡니다."), True):
             ok = subprocess.run(["uv", "tool", "install", "claude-swap==0.26.0"], capture_output=True).returncode == 0
             report.append(L("cswap: installed on its own", "cswap: 따로 설치") if ok
                           else L("cswap: install failed (uv tool install claude-swap)", "cswap: 설치 실패 (uv tool install claude-swap)"))

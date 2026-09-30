@@ -65,14 +65,14 @@ def limit_hook(home, **env):
 def test_limit_hook_schedules_swap_to_account_with_headroom(home):
     home.set_config(onLimit={"enabled": True, "approveCrossing": True, "minHeadroomPct": 15})
     msg = limit_hook(home)
-    assert "예약됨" in msg
+    assert "예약했습니다" in msg
     assert json.loads(marker(home).read_text())["targetNum"] == "2"
 
 
 def test_limit_hook_without_target_or_disabled(home):
     home.set_config(onLimit={"enabled": True, "approveCrossing": True, "minHeadroomPct": 15})
     home.set_usage("2", 100)
-    assert "여유가 있는 다른 계정이 없다" in limit_hook(home)
+    assert "여유 있는 다른 계정이 없으니" in limit_hook(home)
     assert not marker(home).exists()
 
     home.set_usage("2", 40)
@@ -83,7 +83,7 @@ def test_limit_hook_without_target_or_disabled(home):
 
 def test_limit_hook_crossing_needs_approval(home):
     msg = limit_hook(home)  # 기본 fixture: approveCrossing=False, 대상은 team
-    assert "경계 교차 승인이 필요하다" in msg
+    assert "그룹이 달라 승인이 필요합니다" in msg
     assert not marker(home).exists()
 
 
@@ -114,3 +114,14 @@ def test_english_messages(home):
     home.set_config(onLimit={"enabled": True, "approveCrossing": True, "minHeadroomPct": 15})
     home.set_usage("2", 100)
     assert "No other account has room left" in limit_hook(home, CC_BATON_LANG="en")
+
+
+def test_swap_target_by_exact_email_or_unique_group(home):
+    home.add_account("3", "xteam", 10, group="side")  # xteam@example.com 도 "team@example.com" 을 품는다
+    home.set_config(**{"1": {"group": "me"}, "2": {"group": "me"}})
+    sid = "11111111-2222-3333-4444-555555555555"
+    for token, num in (("team@example.com", "2"), ("side", "3")):
+        r = home.run("swap", "request", token, "--sid", sid, "--yes", CC_SWAP_LOOP=1)
+        assert r.returncode == 0, r.stdout + r.stderr
+        assert json.loads((home.state / "request.json").read_text())["targetNum"] == num
+        (home.state / "request.json").unlink()

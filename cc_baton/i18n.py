@@ -9,9 +9,19 @@ _lang = None
 
 
 def detect():
-    """설정이 없을 때 고를 기본 언어."""
+    """설정이 없을 때 고를 기본 언어: 로캘(ko_*) → macOS 선호 언어 첫 번째 → en."""
     loc = os.environ.get("LC_ALL") or os.environ.get("LC_MESSAGES") or os.environ.get("LANG") or ""
-    return "ko" if loc.lower().startswith("ko") else "en"
+    if loc.lower().startswith("ko"):
+        return "ko"
+    if loc and not loc.upper().startswith(("C.", "POSIX")) and loc.upper() != "C":
+        return "en"
+    try:
+        import subprocess
+        out = subprocess.run(["defaults", "read", "-g", "AppleLanguages"], capture_output=True, text=True, timeout=2).stdout
+        first = out.replace("(", "").replace('"', "").split(",")[0].strip().lower()
+        return "ko" if first.startswith("ko") else "en"
+    except Exception:
+        return "en"
 
 
 def lang():

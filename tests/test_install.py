@@ -134,6 +134,10 @@ def test_setup_wizard_in_terminal(home, inst):
     """진짜 터미널(pty)에서 위저드에 답하면 설정·launchd 가 그대로 반영된다."""
     import fcntl, os, pty, select, struct, sys, termios, time  # noqa: E401
     inst("install")
+    seq_p = home.backup / "sequence.json"
+    seq = json.loads(seq_p.read_text())
+    seq["accounts"]["1"]["alias"] = ""  # 별칭이 없는 계정은 위저드가 짧은 이름을 묻는다
+    seq_p.write_text(json.dumps(seq))
     pid, fd = pty.fork()
     if pid == 0:
         os.execve(sys.executable, [sys.executable, "-m", "cc_baton", "setup", "--if-needed"],
@@ -151,8 +155,8 @@ def test_setup_wizard_in_terminal(home, inst):
                 except OSError:
                     return
 
-    # 그룹: personal → side, team → 엔터(그대로) / 절전: 켜고 45분 / 자동 스왑: 끔
-    for answer in (b"ko\r", b"side\r", b"\r", b"y\r", b"45\r", b"n\r", b"n\r", b"n\r"):
+    # 그룹: personal → side, 이름 me, team → 엔터(그대로) / 절전: 켜고 45분 / 자동 스왑: 끔
+    for answer in (b"ko\r", b"side\r", b"me\r", b"\r", b"y\r", b"45\r", b"n\r", b"n\r", b"n\r"):
         pump(0.6)
         try:
             os.write(fd, answer)
@@ -164,6 +168,7 @@ def test_setup_wizard_in_terminal(home, inst):
 
     cfg = json.loads(home.config.read_text())
     assert cfg["1"]["group"] == "side" and cfg["2"]["group"] == "team"
+    assert json.loads(seq_p.read_text())["accounts"]["1"]["alias"] == "me"  # 번들 cswap 으로 저장
     assert cfg["hibernate"] == {"enabled": True, "idleMin": 45.0}
     assert cfg["onLimit"]["enabled"] is False and cfg["setup"]["done"] is True and cfg["language"] == "ko"
     assert cfg["usageRefresh"] == {"enabled": False} and cfg["skipPermissions"] == {"enabled": False}
@@ -178,13 +183,13 @@ def test_setup_wizard_in_terminal(home, inst):
 def test_lang_command_switches_config_and_hook_messages(home, inst):
     home.set_config(language="en")
     home.run("install", CC_BATON_BIN=EXE, CC_BATON_LANG="")
-    msgs = [h.get("statusMessage") for g in settings(home)["hooks"]["UserPromptSubmit"] for h in g["hooks"]]
-    assert "checking /swap" in msgs
+    msgs = [h.get("statusMessage") for g in settings(home)["hooks"]["StopFailure"] for h in g["hooks"]]
+    assert "rate limit reached, scheduling an account swap" in msgs
 
     assert home.run("lang", "ko", CC_BATON_BIN=EXE, CC_BATON_LANG="").returncode == 0
     assert json.loads(home.config.read_text())["language"] == "ko"
-    msgs = [h.get("statusMessage") for g in settings(home)["hooks"]["UserPromptSubmit"] for h in g["hooks"]]
-    assert "/swap 확인 중" in msgs
+    msgs = [h.get("statusMessage") for g in settings(home)["hooks"]["StopFailure"] for h in g["hooks"]]
+    assert "한도 도달, 계정 전환 예약 중" in msgs
     assert home.run("lang", CC_BATON_LANG="").stdout.strip() == "ko"
 
 

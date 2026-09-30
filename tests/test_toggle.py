@@ -35,7 +35,7 @@ def test_update_off_skips_network(home):
     assert r.returncode == 0
     assert not (home.root / "curl-called").exists()
 
-    home.run("toggle", "update", "on")
+    home.set_config(autoUpdate={"enabled": True})
     home.run("claude-update", NPM_PREFIX=prefix)
     assert (home.root / "curl-called").exists()  # 켜져 있으면 레지스트리 조회까지 간다
 
@@ -55,3 +55,12 @@ def test_legacy_config_is_copied_to_new_location(home):
     assert home.run("toggle", "swap", "off").returncode == 0
     assert json.loads(home.config.read_text())["onLimit"]["enabled"] is False
     assert json.loads(legacy.read_text())["onLimit"]["enabled"] is True  # 예전 파일은 건드리지 않는다
+
+
+def test_update_cannot_be_turned_on_for_a_self_updating_claude(home):
+    home.set_config(autoUpdate={"enabled": False})
+    r = home.run("toggle", "update", "on")  # 가짜 HOME 의 PATH 에는 npm 설치본 claude 가 없다
+    assert r.returncode == 1 and "npm" in r.stderr
+    assert home.run("toggle", "is-on", "update").returncode == 1
+    assert home.run("toggle", "autoswap", "off").returncode == 0  # HUD 용어로도 부른다
+    assert home.run("toggle", "is-on", "swap").returncode == 1

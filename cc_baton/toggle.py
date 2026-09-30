@@ -39,11 +39,18 @@ def set_enabled(key, on):
     st.write_json(path, cfg)
 
 
+ALIASES = {"sleep": "hib", "autoswap": "swap"}  # HUD·문서 용어로도 부를 수 있게
+
+
 def main(argv=None):
-    argv = sys.argv[1:] if argv is None else argv
+    argv = [ALIASES.get(a, a) for a in (sys.argv[1:] if argv is None else argv)]
     if len(argv) == 2 and argv[0] == "is-on" and argv[1] in KEYS:
         return 0 if st.feature(KEYS[argv[1]])["enabled"] else 1
     if len(argv) == 2 and argv[0] in KEYS and argv[1] in ("on", "off"):
+        if argv[0] == "update" and argv[1] == "on" and not st.claude_is_npm():
+            print(L("Your Claude Code updates itself (it isn't an npm install), so this switch has nothing to do.",
+                    "Claude Code 가 스스로 업데이트하는 설치본(npm 이 아님)이라 이 스위치는 할 일이 없습니다."), file=sys.stderr)
+            return 1
         set_enabled(KEYS[argv[0]], argv[1] == "on")
     elif argv:
         print(L(USAGE_EN, USAGE_KO), file=sys.stderr)

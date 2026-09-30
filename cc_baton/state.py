@@ -115,7 +115,7 @@ def active_num():
 
 
 def resolve(token):
-    """번호/별칭/이메일(부분) → 계정 dict. 못 찾으면 None."""
+    """번호 → 별칭 → 이메일(정확히) → 이메일(부분, 하나일 때) → 그룹 이름(그 그룹에 계정이 하나일 때). 못 찾으면 None."""
     if not token:
         return None
     t = str(token).strip().lower()
@@ -126,8 +126,14 @@ def resolve(token):
     for a in accs:
         if a["alias"].lower() == t:
             return a
+    for a in accs:
+        if a["email"].lower() == t:
+            return a
     hits = [a for a in accs if t in a["email"].lower()]
-    return hits[0] if len(hits) == 1 else None
+    if len(hits) == 1:
+        return hits[0]
+    in_group = [a for a in accs if group(a["num"]) == t]
+    return in_group[0] if len(in_group) == 1 else None
 
 
 def slugify_email(email):
@@ -332,6 +338,12 @@ FEATURE_DEFAULTS = {
 }
 UPDATE_FAILED = STATE_DIR / "update-failed"  # claude-update 가 설치 실패 시 남긴다
 HIB_LABEL = "io.github.juunghyun.cc-baton.hib"  # hib tick 을 돌리는 launchd 에이전트
+
+
+def claude_is_npm():
+    """PATH 의 claude 가 npm 전역 설치본인가. 공식 설치본은 스스로 업데이트하므로 우리가 올리지 않는다."""
+    c = shutil.which("claude")
+    return bool(c) and "node_modules/@anthropic-ai/claude-code" in str(Path(c).resolve())
 
 
 def feature(key):

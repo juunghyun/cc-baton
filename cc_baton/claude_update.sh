@@ -74,8 +74,8 @@ latest="$(curl -fsS --max-time 5 "https://registry.npmjs.org/$PKG/latest" 2>/dev
   | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" 2>/dev/null)"
 
 if [[ -z "$latest" ]]; then
-  echo "${DIM}[cc-baton] $(m "couldn't check the latest version (network); running the installed ${installed:-?}" "최신 버전 확인 실패(네트워크) — 설치된 ${installed:-?} 로 실행")${R}" >&2
-  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing; another tab may be installing" "$BIN 이 없다 — 다른 탭이 설치 중일 수 있다")${R}" >&2
+  echo "${DIM}[cc-baton] $(m "couldn't check the latest version (network); running the installed ${installed:-?}" "최신 버전을 확인하지 못해(네트워크) 설치된 ${installed:-?} 로 실행합니다")${R}" >&2
+  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing; another tab may be installing" "$BIN 이 없습니다. 다른 탭에서 설치 중일 수 있습니다")${R}" >&2
   exit 0
 fi
 
@@ -89,13 +89,13 @@ up_to_date() {
 if up_to_date "$installed"; then
   rm -f "$FAILED"   # 이미 최신 — 예전 실패 표시는 낡은 것
   # 내가 설치할 일은 없다. 다만 다른 탭이 지금 reify 중일 수 있으니 bin 은 확인하고 넘긴다.
-  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing; another tab may be installing" "$BIN 이 없다 — 다른 탭이 설치 중일 수 있다")${R}" >&2
+  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing; another tab may be installing" "$BIN 이 없습니다. 다른 탭에서 설치 중일 수 있습니다")${R}" >&2
   exit 0
 fi
 
 if ! acquire_lock; then
-  echo "${YEL}![cc-baton] $(m "waited 90s for another tab's update; running the installed ${installed:-?}" "다른 탭의 업데이트를 90초 기다렸다 — 설치된 ${installed:-?} 로 실행")${R}" >&2
-  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing" "$BIN 이 없다")${R}" >&2
+  echo "${YEL}![cc-baton] $(m "waited 90s for another tab's update; running the installed ${installed:-?}" "다른 탭의 업데이트를 90초 기다렸습니다. 설치된 ${installed:-?} 로 실행합니다")${R}" >&2
+  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing" "$BIN 이 없습니다")${R}" >&2
   exit 0
 fi
 
@@ -103,7 +103,7 @@ fi
 installed="$(installed_version)"
 if up_to_date "$installed"; then
   release_lock
-  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing" "$BIN 이 없다")${R}" >&2
+  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing" "$BIN 이 없습니다")${R}" >&2
   exit 0
 fi
 
@@ -113,13 +113,13 @@ if npm install -g "$PKG@$latest" --no-fund --no-audit --loglevel=error >&2; then
   rm -f "$FAILED"
 else
   mkdir -p "$(dirname "$FAILED")" && touch "$FAILED"
-  echo "${YEL}![cc-baton] $(m "update failed; running the installed ${installed:-?}. By hand: npm i -g $PKG@latest" "업데이트 실패 — 설치된 ${installed:-?} 로 실행한다. 수동: npm i -g $PKG@latest")${R}" >&2
+  echo "${YEL}![cc-baton] $(m "update failed; running the installed ${installed:-?}. By hand: npm i -g $PKG@latest" "업데이트에 실패해 설치된 ${installed:-?} 로 실행합니다. 직접: npm i -g $PKG@latest")${R}" >&2
 fi
 release_lock
 
 # 여기서 bin 이 없으면 cswap 이 exec 단계에서 파이썬 트레이스백으로 죽는다. 먼저 알려준다.
 if ! wait_for_bin; then
-  echo "${YEL}![cc-baton] $(m "$BIN has been missing for 40s; launching may fail." "$BIN 이 40초째 없다 — 실행이 실패할 수 있다.")" >&2
+  echo "${YEL}![cc-baton] $(m "$BIN has been missing for 40s; launching may fail." "$BIN 이 40초째 없습니다. 실행이 실패할 수 있습니다.")" >&2
   echo "   $(m "Fix by hand" "수동 복구"): npm i -g $PKG@latest${R}" >&2
 fi
 exit 0

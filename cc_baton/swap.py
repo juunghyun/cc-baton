@@ -100,6 +100,10 @@ def cmd_request(argv, sid_override=None):
     rest = [a for a in argv if not a.startswith("-")]
     if not rest:
         accs = st.accounts()
+        if not accs:
+            print(L("No accounts registered in claude-swap yet. In a terminal, while logged in to Claude Code: cswap add",
+                    "claude-swap 에 등록된 계정이 없습니다. Claude Code 에 로그인한 상태로 터미널에서: cswap add"))
+            return 0
         cur = st.identity()["num"] or st.current_num()
         now_label = st.resolve(cur)['label'] if st.resolve(cur) else cur
         print(BOLD + L("Accounts", "계정 목록") + R + "  " + L(f"(current: {now_label})", f"(현재: {now_label})"))
@@ -112,27 +116,27 @@ def cmd_request(argv, sid_override=None):
 
     target = st.resolve(rest[0])
     if not target:
-        die(L(f"No account '{rest[0]}'. Run `/swap` alone to list accounts.", f"'{rest[0]}' 계정을 못 찾음. `/swap` 만 치면 목록이 나온다."))
+        die(L(f"No account '{rest[0]}'. Run `/swap` alone to list accounts.", f"'{rest[0]}' 계정을 찾지 못했습니다. `/swap` 만 입력하면 목록이 나옵니다."))
     cur = st.identity()["num"] or st.current_num()
     if target["num"] == cur:
-        die(L(f"Already on {target['label']}.", f"이미 {target['label']} 계정이다."))
+        die(L(f"Already on {target['label']}.", f"이미 {target['label']} 계정입니다."))
 
     sid = sid_override or sid_flag or os.environ.get("CLAUDE_CODE_SESSION_ID", "")
     src_profile = current_profile()
     dst_profile = st.profile_dir(target["num"])
     if not dst_profile:
-        die(L(f"Couldn't find the profile folder for {target['label']}.", f"{target['label']} 의 프로필 경로를 못 구했다."))
+        die(L(f"Couldn't find the profile folder for {target['label']}.", f"{target['label']} 의 프로필 경로를 찾지 못했습니다."))
 
     cross = st.crosses_boundary(cur, target["num"])
     if cross and not yes:
         ck, tk = st.group(cur), st.group(target["num"])
         tl = f"{BOLD}{target['label']}{R}"
-        print(YEL + L(f"⚠ This swap crosses groups: {ck.upper()} → {tk.upper()}", f"⚠ 경계를 넘는 스왑이다: {ck.upper()} → {tk.upper()}") + R)
+        print(YEL + L(f"⚠ This swap crosses groups: {ck.upper()} → {tk.upper()}", f"⚠ 그룹이 다른 계정으로 옮깁니다: {ck.upper()} → {tk.upper()}") + R)
         print(L(f"  The whole transcript of this conversation will be copied to {tl} ({tk}),",
                 f"  이 대화의 트랜스크립트 전체가 {tl}({tk}) 프로필로 복사되고,"))
-        print(L(f"  and further requests will be billed to {tl}.", f"  이후 요청은 {tl} 계정의 크레딧으로 전송된다."))
+        print(L(f"  and further requests will be billed to {tl}.", f"  이후 요청은 {tl} 계정의 사용량으로 처리됩니다."))
         print(L("  Make sure it's OK to move this conversation between these accounts (e.g. work ↔ personal).\n",
-                "  업무 대화를 개인 계정으로(또는 그 반대로) 넘기는 게 맞는지 확인해라.\n"))
+                "  업무 대화를 개인 계정으로(또는 그 반대로) 옮겨도 되는지 확인하세요.\n"))
         print(L("  To go ahead: ", "  진행하려면: ") + f"{BOLD}/swap {rest[0]} --yes{R}")
         return 2
 
@@ -149,15 +153,15 @@ def cmd_request(argv, sid_override=None):
     if not os.environ.get("CC_SWAP_LOOP"):
         st.MARKER.unlink(missing_ok=True)
         print(f"{YEL}!{R} " + L("Not running inside `baton`, so it can't relaunch for you. After exiting, run:\n",
-                                "`baton` 밖이라 자동 재기동이 안 된다. 종료 후 아래를 실행해라:\n"))
+                                "`baton` 으로 연 세션이 아니라 자동으로 다시 열 수 없습니다. 종료 후 아래를 실행하세요:\n"))
         print(f"  {BOLD}cc-baton swap handoff {target['num']} --sid {sid} --src-profile {src_profile} && \\")
         print(f"  cc-baton cswap run {target['num']} -- --resume {sid}{R}")
         return 3
 
     print(f"{GRN}✓{R} " + L("Next account: ", "다음 계정: ") + f"{BOLD}{target['label']}{R} [{st.group(target['num'])}]"
-          + (f"  {YEL}" + L("(group crossing approved)", "(경계 교차 승인됨)") + R if cross else ""))
+          + (f"  {YEL}" + L("(group crossing approved)", "(그룹 교차 승인됨)") + R if cross else ""))
     print(f"  {DIM}" + L(f"Press Ctrl+D to continue this exact conversation on {target['label']}.",
-                         f"Ctrl+D 를 누르면 이 대화 그대로 {target['label']} 계정으로 재개된다.") + R)
+                         f"Ctrl+D 를 누르면 이 대화 그대로 {target['label']} 계정에서 이어집니다.") + R)
     return 0
 
 
@@ -178,12 +182,12 @@ def cmd_consume(argv):
         return 1
     st.MARKER.unlink(missing_ok=True)
     if time.time() - requested > MARKER_TTL:
-        print(DIM + L("[cc-baton] Ignored a stale swap request.", "[cc-baton] 오래된 스왑 요청을 무시했다.") + R, file=sys.stderr)
+        print(DIM + L("[cc-baton] Ignored a stale swap request.", "[cc-baton] 오래된 스왑 요청을 무시했습니다.") + R, file=sys.stderr)
         return 1
     target = st.resolve(target_num)
     dst_profile = st.profile_dir(target_num) if target else None
     if not dst_profile:
-        print(YEL + L(f"![cc-baton] Account {target_num} is gone; not switching.", f"![cc-baton] {target_num}번 계정이 없어 전환하지 않는다.") + R,
+        print(YEL + L(f"![cc-baton] Account {target_num} is gone; not switching.", f"![cc-baton] {target_num}번 계정이 없어 전환하지 않습니다.") + R,
               file=sys.stderr)
         return 1
 
@@ -198,12 +202,12 @@ def cmd_consume(argv):
                   + L(f"{target['label']} profile", f"{target['label']} 프로필") + R, file=sys.stderr)
         except Exception as exc:
             print(YEL + L(f"![cc-baton] Couldn't copy the transcript ({exc}); switching without resuming.",
-                          f"![cc-baton] 트랜스크립트 복사 실패({exc}) — resume 없이 전환한다.") + R,
+                          f"![cc-baton] 트랜스크립트를 복사하지 못해({exc}) 이어 가지 않고 전환합니다.") + R,
                   file=sys.stderr)
             sid = ""
     else:
         print(YEL + L("![cc-baton] Couldn't find the transcript; switching without resuming.",
-                      "![cc-baton] 트랜스크립트를 못 찾았다 — resume 없이 전환한다.") + R, file=sys.stderr)
+                      "![cc-baton] 트랜스크립트를 찾지 못해 이어 가지 않고 전환합니다.") + R, file=sys.stderr)
         sid = ""
 
     print(f"{target_num}\t{sid}")
@@ -298,7 +302,7 @@ def hook_limit(data):
     msg = (data.get("last_assistant_message") or "").strip()
     if MODEL_SCOPED_RE.search(msg):
         _emit(L(f"[cc-baton] This is a per-model limit: {msg} Try /model first. To swap accounts anyway: /swap <account> --yes",
-                f"[cc-baton] 모델별 한도다: {msg} 계정 스왑보다 /model 전환이 먼저다. 그래도 계정을 바꾸려면 /swap <계정> --yes"))
+                f"[cc-baton] 모델별 한도입니다: {msg} 계정보다 /model 로 모델을 먼저 바꿔 보세요. 그래도 계정을 바꾸려면 /swap <계정> --yes"))
         return 0
 
     cur = st.identity()["num"] or st.current_num()
@@ -307,7 +311,7 @@ def hook_limit(data):
             req = json.loads(st.MARKER.read_text())
             if time.time() - (req.get("requestedAt") or 0) <= MARKER_TTL:
                 _emit(L(f"[cc-baton] Already scheduled to {req.get('targetLabel')}. Press Ctrl+D to continue this conversation there.",
-                        f"[cc-baton] 이미 {req.get('targetLabel')} 계정으로 예약돼 있다. Ctrl+D 를 누르면 이 대화 그대로 이어진다."))
+                        f"[cc-baton] 이미 {req.get('targetLabel')} 계정으로 예약돼 있습니다. Ctrl+D 를 누르면 이 대화 그대로 이어집니다."))
                 return 0
         except Exception:
             pass
@@ -315,14 +319,14 @@ def hook_limit(data):
     target = pick_limit_target(cur, cfg)
     if not target:
         _emit(L("[cc-baton] Rate limit reached. No other account has room left; wait for the reset or pick one with /swap.",
-                "[cc-baton] 한도 도달. 여유가 있는 다른 계정이 없다 — 리셋을 기다리거나 /swap 으로 직접 골라라."))
+                "[cc-baton] 한도에 도달했습니다. 여유 있는 다른 계정이 없으니 리셋을 기다리거나 /swap 으로 직접 고르세요."))
         return 0
     tk = st.group(target["num"])
     cross = st.crosses_boundary(cur, target["num"])
     if cross and not cfg["approveCrossing"]:
         _emit(L(f"[cc-baton] Rate limit reached. Moving to {target['label']}[{tk}] crosses groups and needs your OK: ",
-                f"[cc-baton] 한도 도달. {target['label']}[{tk}] 로 넘어가려면 경계 교차 승인이 필요하다: ")
-              + f"/swap {target['label']} --yes")
+                f"[cc-baton] 한도에 도달했습니다. {target['label']}[{tk}] 는 그룹이 달라 승인이 필요합니다: ")
+              + f"/swap {target['num']} --yes")
         return 0
 
     rc, out = _run_captured(cmd_request, [target["num"], "--yes"],
@@ -331,13 +335,13 @@ def hook_limit(data):
     head = (L("[cc-baton] Rate limit reached → ", "[cc-baton] 한도 도달 → ") + f"{target['label']}[{tk}]"
             + (L(f" (5h {pct:.0f}% used)", f" (5h {pct:.0f}% 사용)") if pct is not None else ""))
     if rc == 0:
-        _emit(head + L(" scheduled. Press Ctrl+D to continue this conversation there.", " 로 예약됨. Ctrl+D 를 누르면 이 대화 그대로 이어진다.")
-              + (L(" · group crossing pre-approved by onLimit.approveCrossing", " · 그룹 교차는 onLimit.approveCrossing 으로 사전 승인됨") if cross else ""))
+        _emit(head + L(" scheduled. Press Ctrl+D to continue this conversation there.", " 로 예약했습니다. Ctrl+D 를 누르면 이 대화 그대로 이어집니다.")
+              + (L(" · your settings allow moving to another group", " · 설정에서 다른 그룹으로 옮기는 것을 허용해 두었습니다") if cross else ""))
     elif rc == 3:
         _emit(head + L(f": not inside `baton`, so it can't relaunch for you. After exiting, run:\n{out}",
-                       f" — baton 밖이라 자동 재기동은 안 된다. 종료 후 수동으로:\n{out}"))
+                       f" — baton 으로 연 세션이 아니라 자동으로 다시 열 수 없습니다. 종료 후 직접 실행하세요:\n{out}"))
     else:
-        _emit(head + L(f": scheduling failed (rc={rc}).\n{out}", f" 예약 실패(rc={rc}).\n{out}"))
+        _emit(head + L(f": scheduling failed (rc={rc}).\n{out}", f" 예약에 실패했습니다(rc={rc}).\n{out}"))
     return 0
 
 

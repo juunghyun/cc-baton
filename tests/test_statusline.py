@@ -52,13 +52,18 @@ def test_settings_row_all_on(home):
     assert row.count(SWITCH_ON) == 3
     text = plain(row)
     assert "⟳ 업데이트" in text and "⏾ 절전" in text and "90m" in text
-    assert "⇄ 한도스왑" in text and "승인필요" in text
+    assert "⇄ 자동 스왑" in text and "같은 그룹만" in text
 
 
 def test_settings_row_off_and_warnings(home):
-    home.set_config(autoUpdate={"enabled": False})
+    home.set_config(autoUpdate={"enabled": False})  # npm 설치본이 아니면 꺼진 업데이트 항목은 숨긴다
     row = render(home, "high")[-1]
-    assert row.count(SWITCH_OFF) == 1 and row.count(SWITCH_ON) == 2
+    assert "업데이트" not in plain(row) and row.count(SWITCH_ON) == 2
+
+    home.set_config(hibernate={"enabled": False, "idleMin": 90})
+    row = render(home, "high")[-1]
+    assert row.count(SWITCH_OFF) == 1 and "꺼짐" in plain(row)
+    home.set_config(hibernate={"enabled": True, "idleMin": 90})
 
     home.set_config(autoUpdate={"enabled": True})
     home.state.mkdir(parents=True, exist_ok=True)

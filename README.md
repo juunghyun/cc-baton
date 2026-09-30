@@ -21,18 +21,18 @@ Your team seat and your personal plan are separate Claude accounts, and a conver
 ## Install
 
 ```sh
-curl -LsSf https://astral.sh/uv/install.sh | sh          # only if you don't have uv
+command -v uv >/dev/null || { curl -LsSf https://astral.sh/uv/install.sh | sh && . "$HOME/.local/bin/env"; }
 uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton && ~/.local/bin/cc-baton install
 ```
 
-Open a new terminal and run **`baton`**. The first run asks a few questions (language, account groups, HUD, hibernation, auto-swap, usage refresh), then shows the account picker. You need at least one account in [claude-swap](https://github.com/realiti4/claude-swap), which comes bundled: log in to Claude Code and run `cswap add`.
+Open a new terminal and run **`baton`** (a zsh function; macOS uses zsh by default). From now on, start Claude Code with `baton` instead of `claude`. The first run asks a few questions (language, account groups and short names, HUD, hibernation, auto-swap, usage refresh, permission prompts), then shows the account picker. Accounts live in [claude-swap](https://github.com/realiti4/claude-swap), which comes bundled: log in to Claude Code and run `cswap add` for each account. With a single account you still get the HUD and hibernation.
 
 `cc-baton install` never asks anything and is safe to re-run. It backs up `~/.claude/settings.json` before touching it and never replaces a statusline you already have without asking.
 
 <details>
 <summary>Installing with an AI agent?</summary>
 
-Run exactly the two lines above (skip the first if `uv --version` works). Don't edit `~/.claude/settings.json` or `~/.zshrc` yourself. Show the user what `cc-baton install` printed and tell them to open a new terminal and run `baton` to finish setup.
+Run exactly the two lines above. Don't edit `~/.claude/settings.json` or `~/.zshrc` yourself. Show the user what `cc-baton install` printed and tell them to open a new terminal and run `baton` to finish setup.
 
 </details>
 
@@ -55,11 +55,13 @@ Run exactly the two lines above (skip the first if `uv --version` works). Don't 
 | Command | What it does |
 |---|---|
 | `baton` | Pick an account and start Claude Code (`baton work` to name one) |
-| `/swap <account>` | Move this conversation to another account, then press Ctrl+D |
+| `/swap <account>` | Move this conversation to another account (number, short name or email), then press Ctrl+D |
 | `/sleep` | Hibernate this session now |
 | `baton --wake` | Bring back a hibernated session |
-| `cc-baton toggle update\|hib\|swap on\|off` | Turn a feature on or off |
+| `cc-baton toggle update\|sleep\|autoswap\|usage\|bypass on\|off` | Turn a feature on or off |
 | `cc-baton setup` · `lang en\|ko` · `upgrade` | Setup again · display language · update cc-baton |
+
+Claude Code shows `/swap` as "blocked by hook": that's expected, the command is handled before it reaches the model. If one Ctrl+D doesn't exit, press it again. Rename an account's short name any time with `cswap alias <number> <name>`.
 
 ## Uninstall
 

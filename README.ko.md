@@ -21,18 +21,18 @@
 ## 설치
 
 ```sh
-curl -LsSf https://astral.sh/uv/install.sh | sh          # uv 가 없을 때만
+command -v uv >/dev/null || { curl -LsSf https://astral.sh/uv/install.sh | sh && . "$HOME/.local/bin/env"; }
 uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton && ~/.local/bin/cc-baton install
 ```
 
-새 터미널을 열고 **`baton`** 을 실행하세요. 처음 실행하면 몇 가지(언어, 계정 그룹, HUD, 절전, 자동 스왑, 사용량 갱신)를 묻고 계정 피커가 뜹니다. 함께 설치되는 [claude-swap](https://github.com/realiti4/claude-swap) 에 계정이 하나 이상 있어야 합니다. Claude Code 에 로그인한 상태에서 `cswap add` 를 실행하세요.
+새 터미널을 열고 **`baton`** 을 실행하세요(zsh 함수이며, macOS 기본 셸이 zsh 입니다). 앞으로 Claude Code 는 `claude` 대신 `baton` 으로 여세요. 처음 실행하면 몇 가지(언어, 계정 그룹과 짧은 이름, HUD, 절전, 자동 스왑, 사용량 갱신, 권한 확인)를 묻고 계정 피커가 뜹니다. 계정은 함께 설치되는 [claude-swap](https://github.com/realiti4/claude-swap) 에 등록합니다. Claude Code 에 로그인한 상태에서 계정마다 `cswap add` 를 실행하세요. 계정이 하나여도 HUD 와 절전은 쓸 수 있습니다.
 
 `cc-baton install` 은 아무것도 묻지 않고, 여러 번 돌려도 결과가 같습니다. `~/.claude/settings.json` 은 먼저 백업하고, 이미 쓰는 statusline 은 묻지 않고 바꾸지 않습니다.
 
 <details>
 <summary>AI 에이전트로 설치한다면</summary>
 
-위 두 줄을 그대로 실행하세요(`uv --version` 이 되면 첫 줄은 건너뜁니다). `~/.claude/settings.json` 과 `~/.zshrc` 는 직접 고치지 마세요. `cc-baton install` 이 출력한 내용을 사용자에게 보여 주고, 새 터미널에서 `baton` 을 실행해 설정을 마치라고 전하세요.
+위 두 줄을 그대로 실행하세요. `~/.claude/settings.json` 과 `~/.zshrc` 는 직접 고치지 마세요. `cc-baton install` 이 출력한 내용을 사용자에게 보여 주고, 새 터미널에서 `baton` 을 실행해 설정을 마치라고 전하세요.
 
 </details>
 
@@ -55,11 +55,13 @@ uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton && ~/.lo
 | 명령 | 하는 일 |
 |---|---|
 | `baton` | 계정을 골라 Claude Code 실행 (`baton work` 처럼 지정도 가능) |
-| `/swap <계정>` | 이 대화를 다른 계정으로 옮김, 그다음 Ctrl+D |
+| `/swap <계정>` | 이 대화를 다른 계정(번호, 짧은 이름, 이메일)으로 옮김, 그다음 Ctrl+D |
 | `/sleep` | 이 세션을 지금 재우기 |
 | `baton --wake` | 재운 세션 깨우기 |
-| `cc-baton toggle update\|hib\|swap on\|off` | 기능 켜기·끄기 |
+| `cc-baton toggle update\|sleep\|autoswap\|usage\|bypass on\|off` | 기능 켜기·끄기 |
 | `cc-baton setup` · `lang en\|ko` · `upgrade` | 설정 다시 · 화면 언어 · cc-baton 업데이트 |
+
+Claude Code 는 `/swap` 을 "blocked by hook" 으로 표시합니다. 모델에 가기 전에 cc-baton 이 처리했다는 뜻이라 정상입니다. Ctrl+D 한 번에 안 닫히면 한 번 더 누르세요. 계정의 짧은 이름은 `cswap alias <번호> <이름>` 으로 언제든 바꿀 수 있습니다.
 
 ## 제거
 

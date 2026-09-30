@@ -197,8 +197,8 @@ SWITCH = {
 
 def setting(icon, name, state, val="", warn=""):
     sw = SWITCH[state]
-    if state == "off":
-        return f"{DIM}\033[38;5;240m{icon} {name}{R} {sw}"
+    if state == "off":  # 색을 못 보는 경우를 위해 글자로도
+        return f"{DIM}\033[38;5;240m{icon} {name}{R} {sw} {DIM}" + L("off", "꺼짐") + R
     if state == "warn":
         return f"{ORG}{icon}{R} {name} {sw} {BOLD}{ORG}{warn}{R}"
     return f"{GRN}{icon}{R} {name} {sw}" + (f" {DIM}{val}{R}" if val else "")
@@ -238,12 +238,13 @@ def settings_parts(num):
     up, hib, lim = st.feature("autoUpdate"), st.feature("hibernate"), st.feature("onLimit")
     state = lambda on, bad: "off" if not on else ("warn" if bad() else "on")  # noqa: E731
     return [
-        setting("⟳", L("Update", "업데이트"), state(up["enabled"], st.UPDATE_FAILED.exists), warn=L("failed", "실패")),
+        *([setting("⟳", L("Update", "업데이트"), state(up["enabled"], st.UPDATE_FAILED.exists), warn=L("failed", "실패"))]
+          if up["enabled"] or st.claude_is_npm() else []),  # 공식 설치본은 스스로 업데이트하므로 항목을 숨긴다
         setting("⏾", L("Sleep", "절전"), state(hib["enabled"], lambda: not hib_loaded()),
                 val=hib_idle_text(hib["idleMin"]), warn=L("not loaded", "미등록")),
-        setting("⇄", L("Auto-swap", "한도스왑"),
+        setting("⇄", L("Auto-swap", "자동 스왑"),
                 state(lim["enabled"], lambda: not swap_target_exists(num, lim["minHeadroomPct"])),
-                val=L("any group", "교차허용") if lim["approveCrossing"] else L("same group", "승인필요"),
+                val=L("any group", "모든 그룹") if lim["approveCrossing"] else L("same group only", "같은 그룹만"),
                 warn=L("no target", "대상없음")),
     ]
 
@@ -278,7 +279,7 @@ def main():
     badge = f"{kcolor}●{R} {BOLD}{kcolor}{label}{R} {kcolor}[{ktext}]{R}"
     if num is None:
         # 라이브 자격증명이 어느 슬롯에도 없다 — cswap 이 모르는 계정으로 돌고 있다.
-        badge += f" {DIM}" + L("(not in cswap)", "(cswap 미등록)") + R
+        badge += f" {DIM}" + L("(not registered · run cswap add)", "(미등록 · cswap add 로 등록)") + R
     elif ident["drift"]:
         badge += " \033[38;5;196m⚠" + L("drift", "드리프트") + R
     parts = [badge]

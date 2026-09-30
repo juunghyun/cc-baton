@@ -83,7 +83,7 @@ def refresh_if_stale(accs):
         return
     if not st.CSWAP_BIN.exists():
         return
-    print(DIM + L("Refreshing usage…", "잔량 갱신 중…") + R, end="", file=E, flush=True)
+    print(DIM + L("Refreshing usage…", "사용량 갱신 중…") + R, end="", file=E, flush=True)
     try:
         subprocess.run([str(st.CSWAP_BIN), "list", "--json"], capture_output=True, timeout=6)
     except Exception:
@@ -203,7 +203,7 @@ def line_select(accs, default_idx):
         return default_idx
     chosen = st.resolve(raw)
     if not chosen:
-        print(L(f"Unknown account '{raw}'.", f"'{raw}' 를 못 알아들었다."), file=E)
+        print(L(f"Unknown account '{raw}'.", f"'{raw}' 계정을 찾지 못했습니다."), file=E)
         return None
     return next((i for i, a in enumerate(accs) if a["num"] == chosen["num"]), None)
 
@@ -212,7 +212,7 @@ def main():
     accs = st.accounts()
     if not accs:
         print(L("No accounts in claude-swap yet. Log in to Claude Code and run `cswap add` first.",
-                "cswap 에 등록된 계정이 없다. `cswap add` 부터."), file=E)
+                "claude-swap 에 등록된 계정이 없습니다. Claude Code 에 로그인한 뒤 `cswap add` 로 먼저 등록하세요."), file=E)
         return 1
     refresh_if_stale(accs)
 
@@ -237,7 +237,7 @@ def main():
             os.close(tty_fd)
 
     if idx is None:
-        print(DIM + L("Cancelled.", "취소됨.") + R, file=E)
+        print(DIM + L("Cancelled.", "취소했습니다.") + R, file=E)
         return 1
     chosen = accs[idx]
     print(f"{DIM}→ {chosen['label']} [{st.group(chosen['num'])}]{R}", file=E)

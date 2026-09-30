@@ -1,5 +1,6 @@
 import json
 import subprocess
+import time
 
 import pytest
 
@@ -78,3 +79,32 @@ def test_branch_drops_login_name_and_shortens_type(home):
     data = {"model": {"display_name": "Opus 5.5"}, "workspace": {"current_dir": str(repo)}}
     r = home.run("statusline", input=json.dumps(data))
     assert "(ft/proj-1_login)" in plain(r.stdout.split("\n")[0])
+
+
+def test_free_form_groups_and_colors(home):
+    home.set_config(**{"1": {"group": "side"}, "2": {"group": "work", "color": 170}})
+    line1 = render(home, "high")[0]
+    assert plain(line1).startswith("● personal [SIDE]")
+    assert "\x1b[38;5;39m" in line1  # 색을 안 정한 첫 그룹 = 팔레트 첫 색
+    line1 = render(home, "high", CLAUDE_CONFIG_DIR=home.root / TEAM_PROFILE)[0]
+    assert plain(line1).startswith("● team [WORK]") and "\x1b[38;5;170m" in line1
+
+
+def others_segment(home):
+    row2 = plain(render(home, "high")[1])
+    return row2[row2.index("↔"):]
+
+
+def test_other_accounts_registration_order_then_more(home):
+    for num, alias in (("3", "gamma"), ("4", "delta")):
+        home.add_account(num, alias, 10)
+    # 사용 기록이 없으면 등록 순서: team(2), gamma(3) 만 이름으로, 나머지는 외 k개
+    assert others_segment(home) == "↔ team 40%/9%, gamma 10%/9% 외 1개"
+
+
+def test_other_accounts_most_recently_used_first(home):
+    now = time.time()
+    home.touch_session(home.root / TEAM_PROFILE, now - 3600)
+    home.touch_session(home.add_account("3", "gamma", 10), now - 7200)
+    home.touch_session(home.add_account("4", "delta", 10), now - 60)  # 방금 씀
+    assert others_segment(home) == "↔ delta 10%/9%, team 40%/9% 외 1개"

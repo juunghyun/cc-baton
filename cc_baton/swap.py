@@ -93,7 +93,7 @@ def cmd_request(argv, sid_override=None):
         cur = st.identity()["num"] or st.current_num()
         print(f"{BOLD}계정 목록{R}  (현재: {st.resolve(cur)['label'] if st.resolve(cur) else cur})")
         for a in accs:
-            k = st.kind(a["num"])
+            k = st.group(a["num"])
             mark = "●" if a["num"] == cur else " "
             print(f"  {mark} {a['num']}) {a['label']:<12} [{k}]  {DIM}{a['email']}{R}")
         print(f"\n사용법: {BOLD}/swap <번호|별칭>{R}")
@@ -114,7 +114,7 @@ def cmd_request(argv, sid_override=None):
 
     cross = st.crosses_boundary(cur, target["num"])
     if cross and not yes:
-        ck, tk = st.kind(cur), st.kind(target["num"])
+        ck, tk = st.group(cur), st.group(target["num"])
         print(f"{YEL}⚠ 경계를 넘는 스왑이다: {ck.upper()} → {tk.upper()}{R}")
         print(f"  이 대화의 트랜스크립트 전체가 {BOLD}{target['label']}({tk}){R} 프로필로 복사되고,")
         print(f"  이후 요청은 {BOLD}{target['label']}{R} 계정의 크레딧으로 전송된다.")
@@ -137,7 +137,7 @@ def cmd_request(argv, sid_override=None):
         print(f"  cswap run {target['num']} -- --resume {sid}{R}")
         return 3
 
-    print(f"{GRN}✓{R} 다음 계정: {BOLD}{target['label']}{R} [{st.kind(target['num'])}]"
+    print(f"{GRN}✓{R} 다음 계정: {BOLD}{target['label']}{R} [{st.group(target['num'])}]"
           + (f"  {YEL}(경계 교차 승인됨){R}" if cross else ""))
     print(f"  {DIM}Ctrl+D 를 누르면 이 대화 그대로 {target['label']} 계정으로 재개된다.{R}")
     return 0
@@ -283,7 +283,7 @@ def hook_limit(data):
     if not target:
         _emit("[cc-baton] 한도 도달. 여유가 있는 다른 계정이 없다 — 리셋을 기다리거나 /swap 으로 직접 골라라.")
         return 0
-    tk = st.kind(target["num"])
+    tk = st.group(target["num"])
     cross = st.crosses_boundary(cur, target["num"])
     if cross and not cfg["approveCrossing"]:
         _emit(f"[cc-baton] 한도 도달. {target['label']}[{tk}] 로 넘어가려면 경계 교차 승인이 필요하다: "

@@ -195,19 +195,65 @@ def config():
     return _load(config_path(), {})
 
 
-def kind(num):
-    """'team' | 'personal' | 'unknown'."""
+def _account_cfg(num):
     entry = config().get(str(num))
-    if isinstance(entry, dict):
-        k = str(entry.get("kind", "")).lower()
-        if k in ("team", "personal"):
-            return k
-    return "unknown"
+    return entry if isinstance(entry, dict) else {}
+
+
+def group(num):
+    """계정 그룹 이름 (자유롭게 짓는다: work, side, personal …). 없으면 'unknown'.
+
+    0.1 이전 설정의 "kind"(team/personal) 도 그룹 이름으로 읽는다.
+    """
+    g = str(_account_cfg(num).get("group") or _account_cfg(num).get("kind") or "").strip().lower()
+    return g or "unknown"
+
+
+# 색을 안 정한 그룹은 처음 나온 순서대로 받는다. 앞의 둘은 0.1 이전 personal(파랑)·team(주황) 과 같다.
+PALETTE = (39, 208, 170, 42, 220, 203, 81, 214)
+
+
+def color(num):
+    """계정 그룹 색 ANSI. 설정 "color": 256색 번호 또는 "#RRGGBB"."""
+    c = _account_cfg(num).get("color")
+    if isinstance(c, int) and 0 <= c <= 255:
+        return f"\033[38;5;{c}m"
+    if isinstance(c, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", c):
+        r, g_, b = (int(c[i:i + 2], 16) for i in (1, 3, 5))
+        return f"\033[38;2;{r};{g_};{b}m"
+    g = group(num)
+    if g == "unknown":
+        return "\033[38;5;245m"
+    seen = []
+    for a in accounts():
+        ga = group(a["num"])
+        if ga != "unknown" and ga not in seen:
+            seen.append(ga)
+    return f"\033[38;5;{PALETTE[seen.index(g) % len(PALETTE)]}m"
+
+
+def last_used(num):
+    """계정을 마지막으로 쓴 시각(epoch 초). 기록이 없으면 None.
+
+    Claude Code 가 세션 상태가 바뀔 때마다 갱신하는 <프로필>/sessions/*.json 과 프롬프트 기록
+    history.jsonl 의 수정 시각 중 최신. 여러 계정을 동시에 써도 계정마다 따로 잡힌다.
+    stat 만 하므로 statusline 에서 매번 불러도 싸다.
+    """
+    prof = profile_dir(num)
+    if not prof:
+        return None
+    times = []
+    for p in [*Path(prof).glob("sessions/*.json"), Path(prof) / "history.jsonl"]:
+        try:
+            times.append(p.stat().st_mtime)
+        except OSError:
+            pass
+    return max(times) if times else None
 
 
 def crosses_boundary(src_num, dst_num):
-    """team ↔ personal 경계를 넘는 이동인가 (둘 다 알려진 성격일 때만 True)."""
-    a, b = kind(src_num), kind(dst_num)
+    """그룹 경계를 넘는 이동인가 (둘 다 그룹이 정해져 있을 때만 True)."""
+    a, b = group(src_num), group(dst_num)
     return "unknown" not in (a, b) and a != b
 
 

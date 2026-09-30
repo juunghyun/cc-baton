@@ -61,6 +61,32 @@ class Home:
         cfg.update(top)
         self.config.write_text(json.dumps(cfg, ensure_ascii=False, indent=2))
 
+    def add_account(self, num, alias, five_hour, **cfg):
+        """계정 슬롯 하나 추가 (sequence·잔량·설정·프로필 폴더). 프로필 경로를 돌려준다."""
+        email = f"{alias}@example.com"
+        seq_p = self.backup / "sequence.json"
+        seq = json.loads(seq_p.read_text())
+        seq["sequence"].append(int(num))
+        seq["accounts"][num] = {"email": email, "alias": alias}
+        seq_p.write_text(json.dumps(seq))
+        use_p = self.backup / "cache/usage.json"
+        use = json.loads(use_p.read_text())
+        use["accounts"][num] = json.loads(json.dumps(use["accounts"]["1"]))
+        use["accounts"][num]["lastGood"]["five_hour"]["pct"] = five_hour
+        use_p.write_text(json.dumps(use))
+        if cfg:
+            self.set_config(**{num: cfg})
+        prof = self.backup / "sessions" / f"{num}-{alias}_example.com"
+        prof.mkdir(parents=True, exist_ok=True)
+        return prof
+
+    def touch_session(self, prof, when):
+        """그 계정을 when(epoch 초) 에 마지막으로 쓴 것처럼 세션 상태 파일을 남긴다."""
+        f = Path(prof) / "sessions" / "123.json"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("{}")
+        os.utime(f, (when, when))
+
     def transcript(self, profile_rel, sid, slug="-tmp-proj", body='{"type":"user"}\n'):
         p = self.root / profile_rel / "projects" / slug / f"{sid}.jsonl"
         p.parent.mkdir(parents=True, exist_ok=True)

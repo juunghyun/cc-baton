@@ -1,12 +1,13 @@
 {
-  "_comment": "계정 성격 라벨. cswap이 모르는 정보라 여기서 관리한다. kind: team | personal | unknown",
+  "_comment": "계정 그룹. group 은 자유 이름(work, side, personal …), color 는 선택(256색 번호 또는 \"#RRGGBB\", 없으면 그룹 순서대로 자동). 그룹이 다른 계정으로 스왑하면 승인을 받는다.",
   "1": {
-    "kind": "personal",
-    "note": "you@example.com — 개인 Max 20x"
+    "group": "personal",
+    "note": "you@example.com — Max 20x"
   },
   "2": {
-    "kind": "team",
-    "note": "you@example.com — 팀 시트 Max 5x"
+    "group": "work",
+    "color": 208,
+    "note": "you@example.com — Team seat"
   },
   "autoUpdate": {
     "_comment": "cc 실행·스왑 직전 Claude Code 최신화(cc-update). cc-toggle update on|off",
@@ -18,7 +19,7 @@
     "idleMin": 90
   },
   "onLimit": {
-    "_comment": "5h/주간 한도(StopFailure rate_limit 훅)에 걸리면 자동으로 스왑을 예약한다. approveCrossing: team↔personal 교차를 '한도 상황에 한해' 사전 승인. minHeadroomPct: 대상 계정의 5h 여유가 이보다 작으면 후보 제외. enabled=false 면 훅이 아무것도 안 한다.",
+    "_comment": "5h/주간 한도(StopFailure rate_limit 훅)에 걸리면 자동으로 스왑을 예약한다. approveCrossing: 그룹 간 교차를 '한도 상황에 한해' 사전 승인. minHeadroomPct: 대상 계정의 5h 여유가 이보다 작으면 후보 제외. enabled=false 면 훅이 아무것도 안 한다.",
     "enabled": true,
     "approveCrossing": true,
     "minHeadroomPct": 15

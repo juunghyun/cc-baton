@@ -85,3 +85,10 @@ def test_limit_hook_crossing_needs_approval(home):
     msg = limit_hook(home)  # 기본 fixture: approveCrossing=False, 대상은 team
     assert "경계 교차 승인이 필요하다" in msg
     assert not marker(home).exists()
+
+
+def test_crossing_is_any_group_change(home):
+    home.set_config(**{"1": {"group": "side"}, "2": {"group": "side"}})
+    assert home.run("swap", "request", "2", "--sid", SID, CC_SWAP_LOOP=1).returncode == 0
+    home.set_config(**{"2": {"group": "client-a"}})
+    assert home.run("swap", "request", "2", "--sid", SID, CC_SWAP_LOOP=1).returncode == 2

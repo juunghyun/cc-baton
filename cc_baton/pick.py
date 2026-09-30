@@ -20,7 +20,6 @@ from . import state as st
 
 R, DIM, BOLD, REV = "\033[0m", "\033[2m", "\033[1m", "\033[7m"
 HIDE, SHOW = "\033[?25l", "\033[?25h"
-KIND_C = {"team": "\033[38;5;208m", "personal": "\033[38;5;39m", "unknown": "\033[38;5;245m"}
 STALE = 300.0
 E = sys.stderr
 
@@ -94,7 +93,7 @@ def refresh_if_stale(accs):
 def row(a, selected, is_default):
     """계정 한 줄. selected=커서 위치, is_default=cwd 매핑 기본값."""
     g = st.usage(a["num"]) or {}
-    kc = KIND_C[st.kind(a["num"])]
+    kc = st.color(a["num"])
     fable = st.scoped(g, "Fable")
     age = g.get("_age")
     if not g:
@@ -105,7 +104,7 @@ def row(a, selected, is_default):
     cursor = f"{BOLD}❯{R}" if selected else " "
     mark = f"{DIM}·{R}" if is_default and not selected else " "
     name = f"{REV}{kc}{a['label']:<12}{R}" if selected else f"{kc}{a['label']:<12}{R}"
-    return (f" {cursor}{mark}{a['num']}) {name} {kc}{st.kind(a['num']):<9}{R}"
+    return (f" {cursor}{mark}{a['num']}) {name} {kc}{st.group(a['num']):<9}{R}"
             f"{cell(g.get('five_hour'))} {cell(g.get('seven_day'))} {cell(fable, 6)}  {note}")
 
 
@@ -113,7 +112,7 @@ def header(interactive, width=10**4):
     hint = ("↑↓ 이동 · Enter 선택 · 숫자 즉시선택 · q 취소" if interactive
             else "번호/별칭 입력 · Enter = 기본값 · q 취소")
     print(clip(f"\n{BOLD}계정 선택{R} {DIM}({hint}){R}", width), file=E)
-    print(clip(f"{DIM}      계정            성격      5h    1w   Fable   리셋{R}", width), file=E)
+    print(clip(f"{DIM}      계정            그룹      5h    1w   Fable   리셋{R}", width), file=E)
 
 
 def read_key(fd):
@@ -217,7 +216,7 @@ def main():
         print(f"{DIM}취소됨.{R}", file=E)
         return 1
     chosen = accs[idx]
-    print(f"{DIM}→ {chosen['label']} [{st.kind(chosen['num'])}]{R}", file=E)
+    print(f"{DIM}→ {chosen['label']} [{st.group(chosen['num'])}]{R}", file=E)
     print(chosen["num"])
     return 0
 

@@ -27,11 +27,7 @@ BOLD = "\033[1m"
 SEP = f"{DIM} · {R}"
 PIPE = f"{DIM} │ {R}"
 
-KIND_STYLE = {
-    "team": ("\033[38;5;208m", "TEAM"),       # 주황 — 업무 계정
-    "personal": ("\033[38;5;39m", "PERSONAL"),  # 파랑 — 개인 계정
-    "unknown": ("\033[38;5;245m", "?"),
-}
+OTHERS_SHOWN = 2        # 2행에 이름까지 보여줄 다른 계정 수. 나머지는 "외 k개"
 REFRESH_AFTER = 180.0   # 캐시가 이보다 낡으면 백그라운드 갱신을 던진다
 STALE_MARK = 300.0      # 이보다 낡으면 화면에 낡았다고 표시한다
 
@@ -251,7 +247,8 @@ def main():
 
     ident = st.identity()
     num, label = ident["num"], ident["label"]
-    kcolor, ktext = KIND_STYLE[st.kind(num) if num else "unknown"]
+    kcolor = st.color(num) if num else "\033[38;5;245m"
+    ktext = st.group(num).upper() if num and st.group(num) != "unknown" else "?"
 
     # --- line 1: 정체성 + 세션 상태 ---
     badge = f"{kcolor}●{R} {BOLD}{kcolor}{label}{R} {kcolor}[{ktext}]{R}"
@@ -314,8 +311,9 @@ def main():
     else:
         seg = [f"{DIM}5h — │ 1w — ({st.usage_note(num)}){R}"]
 
+    # 다른 계정: 최근에 쓴 순서(기록 없는 계정은 등록 순서로 뒤에). 동시에 여러 계정을 써도 계정별 시각으로 줄 세운다.
     others = []
-    for a in st.accounts():
+    for i, a in enumerate(st.accounts()):
         if a["num"] == num:
             continue
         g2 = st.usage(a["num"])
@@ -325,10 +323,14 @@ def main():
         f7 = (g2.get("seven_day") or {}).get("pct")
         if f5 is None and f7 is None:
             continue
-        okc, _ = KIND_STYLE[st.kind(a["num"])]
-        others.append(f"{okc}{a['label']}{R} {pct_color(f5)}{f5:.0f}%{R}/{pct_color(f7)}{f7:.0f}%{R}")
+        used = st.last_used(a["num"])
+        text = f"{st.color(a['num'])}{a['label']}{R} {pct_color(f5)}{f5:.0f}%{R}/{pct_color(f7)}{f7:.0f}%{R}"
+        others.append(((used is None, -(used or 0), i), text))
+    others = [t for _, t in sorted(others)]
     if others:
-        seg.append(f"{DIM}↔{R} " + f"{DIM},{R} ".join(others))
+        more = len(others) - OTHERS_SHOWN
+        seg.append(f"{DIM}↔{R} " + f"{DIM},{R} ".join(others[:OTHERS_SHOWN])
+                   + (f" {DIM}외 {more}개{R}" if more > 0 else ""))
 
     lines += wrap(seg, PIPE, limit)
     lines += wrap(settings_parts(num), SEP, limit)

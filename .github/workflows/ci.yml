@@ -22,6 +22,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # uv 가 git+file 로 브랜치를 가져가려면 얕은 클론이면 안 된다
       - name: Fresh install end to end
         run: >
           env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin:/usr/sbin:/sbin SHELL=/bin/zsh

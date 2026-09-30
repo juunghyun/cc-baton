@@ -1,101 +1,88 @@
+<div align="center">
+
+<img src="docs/assets/logo.svg" alt="" width="96" />
+
 # cc-baton
 
-**Pass the baton between Claude Code accounts.** Switch accounts in the middle of a session and keep the whole conversation (the transcript itself, not a summary). A statusline HUD shows which account you're on, how much every account has left, and how full your context is.
+**Switch Claude Code accounts mid-task. Keep every word of the conversation.**
 
-macOS only · [한국어 README](README.ko.md) · Built on [claude-swap](https://github.com/realiti4/claude-swap) (MIT). cc-baton is an unofficial add-on, not affiliated with Anthropic or claude-swap.
+[![CI](https://github.com/juunghyun/cc-baton/actions/workflows/ci.yml/badge.svg)](https://github.com/juunghyun/cc-baton/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-8250DF?style=flat-square)](LICENSE)
+[![macOS](https://img.shields.io/badge/platform-macOS-57606A?style=flat-square&logo=apple)](#install)
 
-> Pre-release. Feedback welcome in Issues.
+English | [한국어](README.ko.md)
 
-![cc-baton: account picker, HUD with effort levels, and a /swap across groups](docs/demo.gif)
+</div>
 
-<sub>Recorded with fake accounts in a demo environment ([docs/demo](docs/demo)). Inside Claude Code the HUD sits under the prompt.</sub>
+You hit the 5-hour limit halfway through a refactor. Type `/swap personal`, press Ctrl+D, and the same conversation continues on your other account, transcript and all. A statusline HUD shows which account you're on and how much each one has left.
 
-```
-● work [WORK] · Opus 5.5[1M] ▰▰▰▱▱ high ▌ Lv.60  · ctx 12% · ~/src/app (ft/login-302*)
-5h ██░░░░ 31% 2h04m │ 1w █░░░░░ 11% 3d11h │ ↔ personal 0%/3%, side 12%/40% +1 more
-⟳ Update ▮▮▮ · ⏾ Sleep ▮▮▮ 90m · ⇄ Auto-swap ▮▮▮ same group
-```
-
-- **Line 1:** the account you're on and its group, the model with an effort meter, context usage, folder and branch
-- **Line 2:** 5-hour and weekly usage for this account, then your other accounts, most recently used first
-- **Line 3:** which features are on (`cc-baton toggle`), with a warning if one is on but not actually running
-
-## What you get
-
-- **`/swap <account>`**: moves this conversation to another account. Press Ctrl+D and it continues there with the full transcript. It works even after you've hit your rate limit, because a hook handles it before any model call.
-- **Group check**: give accounts groups (`work`, `personal`, …). Swapping across groups asks you first, so a work conversation doesn't land on a personal account by accident.
-- **Account picker**: `baton` shows every account with its remaining usage, so you start on the one with room.
-- **Hibernate** (optional): sessions left idle get their process stopped to free memory. The tab and the conversation stay; any key brings it back. `/sleep` does it right away.
-- **Auto-swap on rate limits** (optional, off by default): when you hit the limit, a swap to an account with room is scheduled for you.
+![Swapping accounts in Claude Code: the conversation continues on the other account](docs/demo-swap.gif)
 
 ## Install
 
 ```sh
-curl -LsSf https://astral.sh/uv/install.sh | sh          # only if you don't have uv yet
+curl -LsSf https://astral.sh/uv/install.sh | sh          # only if you don't have uv
 uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton && ~/.local/bin/cc-baton install
 ```
 
-Then open a new terminal and run **`baton`**. The first run walks you through a short setup (language, account groups, the HUD, hibernation, auto-swap) and then shows the account picker.
+Open a new terminal and run **`baton`**. The first run asks a few questions (language, account groups, HUD, hibernation, auto-swap), then shows the account picker. You need at least one account in [claude-swap](https://github.com/realiti4/claude-swap), which comes bundled: log in to Claude Code and run `cswap add`.
 
-`cc-baton install` never asks anything and is safe to re-run. It adds the `/swap` and `/sleep` commands, a marked block in `~/.zshrc`, and its hooks in `~/.claude/settings.json` (backed up first; an invalid file is left alone). It only sets the statusline if you don't already have one; if you do, the setup wizard shows a preview and asks.
+`cc-baton install` never asks anything and is safe to re-run. It backs up `~/.claude/settings.json` before touching it and never replaces a statusline you already have without asking.
 
-You need at least one account registered in claude-swap. If you haven't used it before: log in to Claude Code, run `cswap add`, then `/login` to your next account and `cswap add` again.
+<details>
+<summary>Installing with an AI agent?</summary>
 
-### For AI agents installing this
+Run exactly the two lines above (skip the first if `uv --version` works). Don't edit `~/.claude/settings.json` or `~/.zshrc` yourself. Show the user what `cc-baton install` printed and tell them to open a new terminal and run `baton` to finish setup.
 
-Run exactly:
+</details>
 
-```sh
-command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh
-uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton && ~/.local/bin/cc-baton install
-```
+## Why cc-baton
 
-Don't edit `~/.claude/settings.json` or `~/.zshrc` yourself. Show the user the summary that `cc-baton install` prints, then tell them to open a new terminal and run `baton` to finish setup interactively.
+**The whole conversation moves, not a summary.** The transcript file itself is copied to the other account and resumed there, along with its large tool outputs and subagent logs. Your other conversations stay where they were.
+
+**Always know which account you're on.** Three lines under the prompt show the account and its group, the usage left on every account, and which features are on.
+
+![What each part of the HUD means](docs/assets/hud.png)
+
+**Hard to swap the wrong way.** Give accounts groups such as `work` and `personal`. Moving a conversation to another group asks you first.
+
+**Idle tabs stop eating memory.** Optional: a session left idle has its process stopped, and any key brings it back with the conversation intact. `/sleep` does it right away.
+
+**Rate-limit autopilot, if you want it.** Off by default. When on, hitting a limit schedules a swap to an account that still has room.
 
 ## Commands
 
-| Command | What |
+| Command | What it does |
 |---|---|
-| `baton [account] [-- claude args]` | Pick an account (or name one) and run Claude Code. Relaunches on `/swap` and wake |
-| `baton --wake` | Pick a hibernated session and bring it back where it was |
-| `/swap <account>` (in Claude Code) | Swap to another account with the full conversation, then Ctrl+D |
-| `/sleep` (in Claude Code) | Hibernate this session now |
-| `cc-baton setup` | Run the setup wizard again |
+| `baton` | Pick an account and start Claude Code (`baton work` to name one) |
+| `/swap <account>` | Move this conversation to another account, then press Ctrl+D |
+| `/sleep` | Hibernate this session now |
+| `baton --wake` | Bring back a hibernated session |
 | `cc-baton toggle update\|hib\|swap on\|off` | Turn a feature on or off |
-| `cc-baton lang en\|ko` | Display language |
-| `cc-baton upgrade` | Upgrade cc-baton and re-apply the wiring |
-| `cc-baton uninstall` | Remove everything cc-baton added |
+| `cc-baton setup` · `lang en\|ko` · `upgrade` | Setup again · display language · update cc-baton |
 
 ## Uninstall
 
 ```sh
-cc-baton uninstall          # asks before deleting settings and the package; --purge / --yes skip the questions
+cc-baton uninstall
 ```
 
-It removes only what cc-baton added and puts back the statusline you had before. Your claude-swap account data (`~/.claude-swap-backup`) is never touched.
+Removes only what cc-baton added and puts back the statusline you had. Your claude-swap account data (`~/.claude-swap-backup`) is never touched.
 
 ## Before you use it
 
-- **Terms**: whether using several accounts around usage limits fits Anthropic's terms is for you to check. Auto-swap is off by default.
-- **Work and personal accounts**: moving a work conversation to a personal account (or the reverse) may be against your company's policy. The group check is there to make you stop and think.
-- **Internal formats**: cc-baton reads claude-swap's state files and parts of Claude Code's statusline input and transcript layout that aren't official APIs. An update to either can break something; cc-baton degrades to blank values instead of crashing.
+- Whether using several accounts around usage limits fits Anthropic's terms is for you to check.
+- Moving work conversations to a personal account (or the reverse) may be against your company's policy.
+- cc-baton reads claude-swap's state files and parts of Claude Code that aren't official APIs. Tested with macOS 15.3, Claude Code 2.1.285 and claude-swap 0.25–0.26.
 
-Tested with macOS 15.3, Claude Code 2.1.285, claude-swap 0.25–0.26, zsh, and Warp. Needs a truecolor terminal. uv installs Python 3.12 for you.
+## More
 
-## How it works
+![Account picker, HUD at each effort level, and the group check](docs/demo.gif)
 
-- `/swap` writes a request; when Claude Code exits, `baton` copies that one transcript (and its side folder of large tool outputs and subagent logs) into the target account's profile and runs `claude --resume` there. Other conversations and prompt history stay separate per account.
-- The account picker, HUD and usage numbers come from claude-swap's local cache. The statusline never waits on the network: when the cache is stale it asks claude-swap to refresh in the background and shows the last numbers meanwhile.
+Development: `uv tool install -e . && cc-baton install` from a clone, tests with `uv run --group dev python -m pytest tests -q`.
 
-## Development
+## Author's note
 
-```sh
-uv tool install -e . && cc-baton install      # from a clone; edits apply immediately
-uv run --group dev python -m pytest tests -q
-```
+I switch between a team seat and a personal plan every day. Each time one ran out in the middle of a task, I lost the thread and had to explain everything again. cc-baton is the smallest thing I could build that keeps the thread.
 
-Each test builds a fake `$HOME` with claude-swap state and runs cc-baton as real processes (the picker and wizard in a pseudo-terminal), so your own setup is never touched.
-
-## License
-
-MIT
+cc-baton is an unofficial add-on, not affiliated with Anthropic or claude-swap. MIT licensed.

@@ -128,3 +128,19 @@ def test_hibernate_shows_threshold_actually_used(home):
     assert "30m 메모리부족" in plain(render(home, "high")[-1])
     (home.state / "hib/threshold.json").write_text(json.dumps({"idleMin": 30, "at": time.time() - 3600}))
     assert "90m" in plain(render(home, "high")[-1])  # 오래된 기록이면 설정값
+
+
+def test_english_hud(home):
+    for num, alias in (("3", "gamma"), ("4", "delta")):
+        home.add_account(num, alias, 10)
+    lines = [plain(x) for x in render(home, "high", CC_BATON_LANG="en")]
+    assert "⟳ Update" in lines[-1] and "⏾ Sleep" in lines[-1] and "⇄ Auto-swap" in lines[-1]
+    assert "same group" in lines[-1]
+    assert lines[1].endswith("+1 more")
+
+
+def test_language_from_config_when_env_unset(home):
+    home.set_config(language="en")
+    assert "⟳ Update" in plain(render(home, "high", CC_BATON_LANG="")[-1])
+    home.set_config(language="ko")
+    assert "⟳ 업데이트" in plain(render(home, "high", CC_BATON_LANG="")[-1])

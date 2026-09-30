@@ -17,6 +17,7 @@ import unicodedata
 from pathlib import Path
 
 from . import state as st
+from .i18n import L
 
 R, DIM, BOLD, REV = "\033[0m", "\033[2m", "\033[1m", "\033[7m"
 HIDE, SHOW = "\033[?25l", "\033[?25h"
@@ -82,12 +83,17 @@ def refresh_if_stale(accs):
         return
     if not st.CSWAP_BIN.exists():
         return
-    print(f"{DIM}잔량 갱신 중…{R}", end="", file=E, flush=True)
+    print(DIM + L("Refreshing usage…", "잔량 갱신 중…") + R, end="", file=E, flush=True)
     try:
         subprocess.run([str(st.CSWAP_BIN), "list", "--json"], capture_output=True, timeout=6)
     except Exception:
         pass
     print("\r\033[K", end="", file=E, flush=True)
+
+
+def pad(text, n):
+    """표시 폭 기준 왼쪽 정렬 (한글은 2칸)."""
+    return text + " " * max(0, n - sum(cw(ch) for ch in text))
 
 
 def short(text, n):
@@ -113,10 +119,12 @@ def row(a, selected, is_default):
 
 
 def header(interactive, width=10**4):
-    hint = ("↑↓ 이동 · Enter 선택 · 숫자 즉시선택 · q 취소" if interactive
-            else "번호/별칭 입력 · Enter = 기본값 · q 취소")
-    print(clip(f"\n{BOLD}계정 선택{R} {DIM}({hint}){R}", width), file=E)
-    print(clip(f"{DIM}      계정            그룹      5h    1w   Fable   리셋{R}", width), file=E)
+    hint = (L("↑↓ move · Enter select · number = pick now · q cancel", "↑↓ 이동 · Enter 선택 · 숫자 즉시선택 · q 취소")
+            if interactive else L("number/alias · Enter = default · q cancel", "번호/별칭 입력 · Enter = 기본값 · q 취소"))
+    print(clip(f"\n{BOLD}" + L("Choose an account", "계정 선택") + f"{R} {DIM}({hint}){R}", width), file=E)
+    head = (f"      {pad(L('Account', '계정'), 12)} {pad(L('Group', '그룹'), 9)}"
+            f"{'5h':>4} {'1w':>4} {'Fable':>6}  {L('Reset', '리셋')}")
+    print(clip(DIM + head + R, width), file=E)
 
 
 def read_key(fd):
@@ -195,7 +203,7 @@ def line_select(accs, default_idx):
         return default_idx
     chosen = st.resolve(raw)
     if not chosen:
-        print(f"'{raw}' 를 못 알아들었다.", file=E)
+        print(L(f"Unknown account '{raw}'.", f"'{raw}' 를 못 알아들었다."), file=E)
         return None
     return next((i for i, a in enumerate(accs) if a["num"] == chosen["num"]), None)
 
@@ -203,7 +211,8 @@ def line_select(accs, default_idx):
 def main():
     accs = st.accounts()
     if not accs:
-        print("cswap 에 등록된 계정이 없다. `cswap add` 부터.", file=E)
+        print(L("No accounts in claude-swap yet. Log in to Claude Code and run `cswap add` first.",
+                "cswap 에 등록된 계정이 없다. `cswap add` 부터."), file=E)
         return 1
     refresh_if_stale(accs)
 
@@ -228,7 +237,7 @@ def main():
             os.close(tty_fd)
 
     if idx is None:
-        print(f"{DIM}취소됨.{R}", file=E)
+        print(DIM + L("Cancelled.", "취소됨.") + R, file=E)
         return 1
     chosen = accs[idx]
     print(f"{DIM}→ {chosen['label']} [{st.group(chosen['num'])}]{R}", file=E)

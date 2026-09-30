@@ -152,7 +152,7 @@ def test_setup_wizard_in_terminal(home, inst):
                     return
 
     # 그룹: personal → side, team → 엔터(그대로) / 절전: 켜고 45분 / 자동 스왑: 끔
-    for answer in (b"side\r", b"\r", b"y\r", b"45\r", b"n\r"):
+    for answer in (b"ko\r", b"side\r", b"\r", b"y\r", b"45\r", b"n\r"):
         pump(0.6)
         os.write(fd, answer)
     pump(1.0)
@@ -162,10 +162,23 @@ def test_setup_wizard_in_terminal(home, inst):
     cfg = json.loads(home.config.read_text())
     assert cfg["1"]["group"] == "side" and cfg["2"]["group"] == "team"
     assert cfg["hibernate"] == {"enabled": True, "idleMin": 45.0}
-    assert cfg["onLimit"]["enabled"] is False and cfg["setup"]["done"] is True
+    assert cfg["onLimit"]["enabled"] is False and cfg["setup"]["done"] is True and cfg["language"] == "ko"
     import plistlib
     plist = plistlib.loads((home.root / "Library/LaunchAgents/io.github.juunghyun.cc-baton.hib.plist").read_bytes())
     assert plist["ProgramArguments"] == [EXE, "hib", "tick"]
 
     r = home.run("setup", "--if-needed", CC_BATON_BIN=EXE)  # 한 번 끝냈으면 다시 묻지 않는다
     assert r.returncode == 0 and r.stderr == ""
+
+
+def test_lang_command_switches_config_and_hook_messages(home, inst):
+    home.set_config(language="en")
+    home.run("install", CC_BATON_BIN=EXE, CC_BATON_LANG="")
+    msgs = [h.get("statusMessage") for g in settings(home)["hooks"]["UserPromptSubmit"] for h in g["hooks"]]
+    assert "checking /swap" in msgs
+
+    assert home.run("lang", "ko", CC_BATON_BIN=EXE, CC_BATON_LANG="").returncode == 0
+    assert json.loads(home.config.read_text())["language"] == "ko"
+    msgs = [h.get("statusMessage") for g in settings(home)["hooks"]["UserPromptSubmit"] for h in g["hooks"]]
+    assert "/swap 확인 중" in msgs
+    assert home.run("lang", CC_BATON_LANG="").stdout.strip() == "ko"

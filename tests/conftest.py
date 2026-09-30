@@ -106,6 +106,7 @@ class Home:
             "PATH": f"{self.fakebin}:{Path(sys.executable).parent}:/usr/bin:/bin",
             "LANG": "en_US.UTF-8",
             "USER": "tester",
+            "CC_BATON_LANG": "ko",  # 기존 검증 문구가 한국어. 영어는 테스트마다 CC_BATON_LANG=en
             "LOGNAME": "tester",
             "COLUMNS": "140",
             "PYTHONPATH": str(ROOT),

@@ -14,6 +14,8 @@ import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .i18n import L
+
 BACKUP = Path.home() / ".claude-swap-backup"
 SEQ_PATH = BACKUP / "sequence.json"
 MAP_PATH = BACKUP / "mappings.json"
@@ -160,7 +162,7 @@ def countdown(resets_at):
     except Exception:
         return ""
     if delta <= 0:
-        return "곧"
+        return L("soon", "곧")
     d, rem = divmod(int(delta), 86400)
     h, rem = divmod(rem, 3600)
     m = rem // 60
@@ -287,12 +289,12 @@ def usage_note(num):
     """측정치가 없을 때 화면에 띄울 사람이 읽을 사유."""
     err = str(usage_error(num) or "")
     if err == "http-403":
-        return "통계 미제공(setup-token/팀 시트)"
+        return L("no usage data (setup-token / team seat)", "통계 미제공(setup-token/팀 시트)")
     if err == "http-429":
-        return "통계 조회 제한(429)"
+        return L("usage lookup rate-limited (429)", "통계 조회 제한(429)")
     if err.startswith("http-"):
-        return f"통계 조회 실패({err[5:]})"
-    return err or "측정 없음"
+        return L(f"usage lookup failed ({err[5:]})", f"통계 조회 실패({err[5:]})")
+    return err or L("not measured yet", "측정 없음")
 
 
 def poll_due(num):

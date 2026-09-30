@@ -17,7 +17,9 @@ import sys
 import time
 from pathlib import Path
 
+from . import i18n
 from . import state as st
+from .i18n import L
 
 R, DIM, BOLD, GRN, YEL, RED = "\033[0m", "\033[2m", "\033[1m", "\033[38;5;42m", "\033[38;5;214m", "\033[38;5;196m"
 DATA = Path(__file__).resolve().parent / "data"
@@ -32,12 +34,16 @@ HIB_LOG = st.STATE_DIR / "hib.log"
 ZSH_BEGIN, ZSH_END = "# >>> cc-baton >>>", "# <<< cc-baton <<<"
 CMD_MARK = "<!-- installed by cc-baton; `cc-baton uninstall` removes this file -->"
 
-# 우리 훅: (이벤트, 그룹 추가 키, 하위명령, 훅 추가 키)
-HOOKS = [
-    ("UserPromptSubmit", {}, "swap hook prompt", {"timeout": 10, "statusMessage": "/swap 확인 중"}),
-    ("StopFailure", {"matcher": "rate_limit"}, "swap hook limit",
-     {"timeout": 10, "statusMessage": "한도 도달 — 계정 스왑 예약 중"}),
-]
+
+
+def our_hooks():
+    """우리 훅: (이벤트, 그룹 추가 키, 하위명령, 훅 추가 키). statusMessage 는 Claude Code 화면에 보인다."""
+    return [
+        ("UserPromptSubmit", {}, "swap hook prompt",
+         {"timeout": 10, "statusMessage": L("checking /swap", "/swap 확인 중")}),
+        ("StopFailure", {"matcher": "rate_limit"}, "swap hook limit",
+         {"timeout": 10, "statusMessage": L("rate limit reached, scheduling an account swap", "한도 도달 — 계정 스왑 예약 중")}),
+    ]
 
 
 def say(msg=""):
@@ -92,13 +98,13 @@ class Settings:
             backup = self.path.with_name(f"{self.path.name}.bak-cc-baton-{time.strftime('%Y%m%d%H%M%S')}")
             shutil.copy2(self.path, backup)
         _write_json(self.path, self.data)
-        return f"백업 {backup.name}" if backup else "새로 만듦"
+        return L(f"backup {backup.name}", f"백업 {backup.name}") if backup else L("created", "새로 만듦")
 
 
 def merge_hooks(data, exe):
     """우리 훅을 한 번씩만. 남의 훅은 그대로 두고, 예전 경로의 우리 훅은 새 경로로 바꾼다."""
     hooks = data.setdefault("hooks", {})
-    for event, group_extra, sub, hook_extra in HOOKS:
+    for event, group_extra, sub, hook_extra in our_hooks():
         groups = [g for g in hooks.get(event, []) if isinstance(g, dict)]
         for g in groups:
             g["hooks"] = [h for h in g.get("hooks", []) if not _ours(h.get("command"))]
@@ -139,15 +145,15 @@ def install_commands(exe):
             mine = dst.is_symlink() and "cc-baton" in os.readlink(dst) or (
                 dst.exists() and CMD_MARK in dst.read_text())
             if not mine:
-                out.append((dst, "건너뜀 (같은 이름의 다른 명령이 있음)"))
+                out.append((dst, L("skipped (you already have a different command with this name)", "건너뜀 (같은 이름의 다른 명령이 있음)")))
                 continue
             if dst.is_symlink():
                 dst.unlink()
             elif dst.read_text() == body:
-                out.append((dst, "그대로"))
+                out.append((dst, L("unchanged", "그대로")))
                 continue
         dst.write_text(body)
-        out.append((dst, "설치"))
+        out.append((dst, L("installed", "설치")))
     return out
 
 
@@ -176,9 +182,9 @@ def install_zshrc(exe):
     text = ZSHRC.read_text() if ZSHRC.exists() else ""
     new = _strip_block(text).rstrip("\n") + "\n\n" + zsh_block(exe)
     if new.lstrip("\n") == text or new == text:
-        return "그대로"
+        return L("unchanged", "그대로")
     ZSHRC.write_text(new.lstrip("\n"))
-    return "추가" if ZSH_BEGIN not in text else "갱신"
+    return L("added", "추가") if ZSH_BEGIN not in text else L("updated", "갱신")
 
 
 def _merge_into(old, new):
@@ -214,12 +220,13 @@ def link_cswap():
     if not bundled.exists():
         return None
     if link.is_symlink() and link.resolve() == bundled.resolve():
-        return "그대로"
+        return L("unchanged", "그대로")
     if link.exists() or link.is_symlink():
-        return "따로 설치된 claude-swap 이 있어 그대로 둠 (cc-baton setup 에서 정리 가능)"
+        return L("left alone: you have claude-swap installed separately (cc-baton setup can clean it up)",
+                 "따로 설치된 claude-swap 이 있어 그대로 둠 (cc-baton setup 에서 정리 가능)")
     link.parent.mkdir(parents=True, exist_ok=True)
     link.symlink_to(bundled)
-    return "연결"
+    return L("linked", "연결")
 
 
 def claude_is_npm():
@@ -260,55 +267,63 @@ def unregister_hib():
 
 
 # ── install ──────────────────────────────────────────────────────────────
+def save_config(**top):
+    cfg = st.config()
+    cfg.update(top)
+    _write_json(st.config_path(), cfg)
+    return cfg
+
+
 def cmd_install(argv):
     exe = bin_path()
     try:
         s = Settings()
     except json.JSONDecodeError as e:
-        say(f"{RED}✗{R} {SETTINGS} 가 올바른 JSON 이 아니라 손대지 않았습니다 ({e}). 고친 뒤 다시 실행하세요.")
+        say(f"{RED}✗{R} " + L(f"{SETTINGS} isn't valid JSON, so it was left alone ({e}). Fix it and run again.",
+                              f"{SETTINGS} 가 올바른 JSON 이 아니라 손대지 않았습니다 ({e}). 고친 뒤 다시 실행하세요."))
         return 1
 
     report = []
-    report += [f"상태 폴더 이관: {m}" for m in migrate_state()]
+    report += [L(f"state folder moved: {m}", f"상태 폴더 이관: {m}") for m in migrate_state()]
 
     merge_hooks(s.data, exe)
     inst = _read_json(INSTALL_STATE, {})
     cur = s.data.get("statusLine")
     if not cur:
         s.data["statusLine"] = our_statusline(exe)
-        report.append("HUD(statusline): 설치")
+        report.append(L("HUD (statusline): installed", "HUD(statusline): 설치"))
     elif _ours(cur.get("command") if isinstance(cur, dict) else cur):
         s.data["statusLine"] = {**cur, **{"command": f"{exe} statusline"}}
     else:
         inst.setdefault("prevStatusLine", cur)
-        report.append("HUD(statusline): 기존 statusline 이 있어 그대로 둠 — `baton` 첫 실행 위저드에서 바꿀 수 있음")
+        report.append(L("HUD (statusline): you already have one, left as is. The setup wizard on first `baton` can switch it",
+                        "HUD(statusline): 기존 statusline 이 있어 그대로 둠 — `baton` 첫 실행 위저드에서 바꿀 수 있음"))
     backup = s.save()
-    report.append("settings.json: " + (f"훅 반영 ({backup})" if backup else "변경 없음"))
+    report.append("settings.json: " + (L(f"hooks added ({backup})", f"훅 반영 ({backup})") if backup else L("no change", "변경 없음")))
 
-    report += [f"명령 {p.name}: {r}" for p, r in install_commands(exe)]
-    report.append(f"~/.zshrc 블록: {install_zshrc(exe)}")
+    report += [L(f"command {p.name}: {r}", f"명령 {p.name}: {r}") for p, r in install_commands(exe)]
+    report.append(L(f"~/.zshrc block: {install_zshrc(exe)}", f"~/.zshrc 블록: {install_zshrc(exe)}"))
     c = link_cswap()
     if c:
-        report.append(f"cswap 명령: {c}")
+        report.append(L(f"cswap command: {c}", f"cswap 명령: {c}"))
 
     cfg = st.config()
     if "autoUpdate" not in cfg:  # npm 으로 깐 Claude Code 만 우리가 올린다. 공식 설치본은 자체 자동 업데이트
-        cfg["autoUpdate"] = {"enabled": claude_is_npm()}
-        _write_json(st.config_path(), cfg)
+        save_config(autoUpdate={"enabled": claude_is_npm()})
     if HIB_PLIST.exists():  # 이미 켜 둔 절전만 새 경로로 갱신. 새로 등록은 위저드에서만
         register_hib(exe)
-        report.append("절전 launchd: 새 경로로 갱신")
+        report.append(L("hibernate launchd agent: updated to the new path", "절전 launchd: 새 경로로 갱신"))
 
     inst["installedAt"] = time.time()
     inst["exe"] = exe
     _write_json(INSTALL_STATE, inst)
 
-    say(f"{GRN}✓{R} cc-baton 설치")
+    say(f"{GRN}✓{R} " + L("cc-baton installed", "cc-baton 설치"))
     for line in report:
         say(f"  {DIM}·{R} {line}")
     done = st.config().get("setup", {}).get("done")
-    say(f"\n  새 터미널을 열고 {BOLD}baton{R} 을 실행하세요."
-        + ("" if done else " 처음 실행하면 설정 위저드가 뜹니다."))
+    say("\n  " + L(f"Open a new terminal and run {BOLD}baton{R}.", f"새 터미널을 열고 {BOLD}baton{R} 을 실행하세요.")
+        + ("" if done else L(" The first run starts a short setup wizard.", " 처음 실행하면 설정 위저드가 뜹니다.")))
     return 0
 
 
@@ -334,7 +349,7 @@ def _preview_hud():
     sample = {"model": {"display_name": "Opus 5.5 (1M context)"}, "effort": {"level": "high"},
               "context_window": {"used_percentage": 12}, "workspace": {"current_dir": str(Path.cwd())}}
     r = subprocess.run([sys.executable, "-m", "cc_baton", "statusline"], input=json.dumps(sample),
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, env={**os.environ, "CC_BATON_LANG": i18n.lang()})
     return "\n".join("    " + line for line in r.stdout.rstrip().split("\n"))
 
 
@@ -354,6 +369,18 @@ def _separate_claude_swap():
     return any(line.startswith("claude-swap ") for line in out.splitlines())
 
 
+def _system_language():
+    """macOS 의 선호 언어 첫 번째 (defaults read -g AppleLanguages). 모르면 로캘."""
+    try:
+        out = subprocess.run(["defaults", "read", "-g", "AppleLanguages"], capture_output=True, text=True, timeout=3).stdout
+        first = out.replace("(", "").replace('"', "").split(",")[0].strip().lower()
+        if first:
+            return "ko" if first.startswith("ko") else "en"
+    except Exception:
+        pass
+    return i18n.detect()
+
+
 def cmd_setup(argv):
     cfg = st.config()
     if "--if-needed" in argv and (cfg.get("setup") or {}).get("done"):
@@ -361,28 +388,43 @@ def cmd_setup(argv):
     try:
         t = Tty()
     except OSError:
-        say(f"{DIM}[cc-baton] 설정 위저드는 터미널에서 `cc-baton setup` 으로 실행하세요.{R}")
+        say(DIM + L("[cc-baton] Run the setup wizard from a terminal: `cc-baton setup`.",
+                    "[cc-baton] 설정 위저드는 터미널에서 `cc-baton setup` 으로 실행하세요.") + R)
         return 0
     exe = bin_path()
     w = lambda msg="": (t.f.write(msg + "\n"), t.f.flush())  # noqa: E731
     try:
-        w(f"\n{BOLD}cc-baton 설정{R} {DIM}(엔터 = 괄호 안 기본값, 나중에 cc-baton setup 으로 다시){R}\n")
+        # 0) 언어 (두 언어로 묻는다)
+        cur_lang = cfg.get("language") if cfg.get("language") in i18n.LANGS else _system_language()
+        ans = t.ask(f"\n{BOLD}Language / 언어{R} [en/ko] ({cur_lang}): ", cur_lang).lower()
+        chosen = "ko" if ans.startswith(("ko", "k", "한")) else ("en" if ans.startswith(("en", "e")) else cur_lang)
+        save_config(language=chosen)
+        i18n.set_lang(chosen)
+
+        w("\n" + BOLD + L("cc-baton setup", "cc-baton 설정") + R + " " + DIM
+          + L("(Enter = the value in brackets. Run cc-baton setup any time to change)",
+              "(엔터 = 괄호 안 기본값, 나중에 cc-baton setup 으로 다시)") + R + "\n")
 
         # 1) 계정 그룹
+        cfg = st.config()
         accs = st.accounts()
-        w(f"{BOLD}1. 계정 그룹{R} {DIM}— 그룹이 다른 계정으로 스왑할 땐 한 번 더 확인합니다 (예: work, personal){R}")
+        w(BOLD + L("1. Account groups", "1. 계정 그룹") + R + " " + DIM
+          + L("— swapping to an account in another group asks you first (e.g. work, personal)",
+              "— 그룹이 다른 계정으로 스왑할 땐 한 번 더 확인합니다 (예: work, personal)") + R)
         if not accs:
-            w(f"  claude-swap 에 등록된 계정이 없습니다. 지금 로그인된 계정을 {BOLD}cswap add{R} 로 먼저 등록하세요.")
+            w("  " + L(f"No accounts in claude-swap yet. Register the account you're logged in with: {BOLD}cswap add{R}",
+                       f"claude-swap 에 등록된 계정이 없습니다. 지금 로그인된 계정을 {BOLD}cswap add{R} 로 먼저 등록하세요."))
         for a in accs:
             cur = st.group(a["num"])
-            g = t.ask(f"  {a['num']}) {a['label']:<14} 그룹 [{'' if cur == 'unknown' else cur}]: ",
-                      "" if cur == "unknown" else cur)
+            shown = "" if cur == "unknown" else cur
+            g = t.ask(f"  {a['num']}) {a['label']:<14} " + L("group", "그룹") + f" [{shown}]: ", shown)
             if g:
                 entry = cfg.setdefault(a["num"], {})
                 entry["group"] = g.lower()
                 entry.pop("kind", None)
         if len(accs) == 1:
-            w(f"  {DIM}계정을 더 쓰려면: Claude Code 에서 /login 으로 다른 계정에 로그인한 뒤 cswap add{R}")
+            w("  " + DIM + L("To add another account: log in to it with /login in Claude Code, then run cswap add",
+                              "계정을 더 쓰려면: Claude Code 에서 /login 으로 다른 계정에 로그인한 뒤 cswap add") + R)
         _write_json(st.config_path(), cfg)
 
         # 2) HUD
@@ -390,69 +432,92 @@ def cmd_setup(argv):
         s = Settings()
         cur = s.data.get("statusLine")
         if cur and not _ours(cur.get("command") if isinstance(cur, dict) else cur):
-            w(f"  이미 쓰시는 statusline 이 있습니다. cc-baton HUD 는 이렇게 보입니다:\n{_preview_hud()}")
-            if t.yes("  cc-baton HUD 로 바꿀까요? (지울 때 원래 것으로 되돌립니다)"):
+            w("  " + L("You already have a statusline. This is what the cc-baton HUD looks like:",
+                       "이미 쓰시는 statusline 이 있습니다. cc-baton HUD 는 이렇게 보입니다:") + f"\n{_preview_hud()}")
+            if t.yes("  " + L("Switch to the cc-baton HUD? (uninstall puts yours back)",
+                              "cc-baton HUD 로 바꿀까요? (지울 때 원래 것으로 되돌립니다)")):
                 inst = _read_json(INSTALL_STATE, {})
                 inst.setdefault("prevStatusLine", cur)
                 _write_json(INSTALL_STATE, inst)
                 s.data["statusLine"] = our_statusline(exe)
                 s.save()
-                w("  → 바꿨습니다")
+                w("  → " + L("switched", "바꿨습니다"))
         else:
             if not cur:
                 s.data["statusLine"] = our_statusline(exe)
                 s.save()
-            w("  → 적용돼 있습니다")
+            w("  → " + L("in place", "적용돼 있습니다"))
 
         # 3) 절전
-        w(f"\n{BOLD}3. 절전{R} {DIM}— 오래 쉬는 세션의 프로세스를 끄고, 탭과 대화는 남깁니다. 키 하나로 이어서 시작{R}")
+        w("\n" + BOLD + L("3. Hibernate", "3. 절전") + R + " " + DIM
+          + L("— stops the process of sessions left idle, keeps the tab and the conversation. Any key resumes",
+              "— 오래 쉬는 세션의 프로세스를 끄고, 탭과 대화는 남깁니다. 키 하나로 이어서 시작") + R)
         hib = st.feature("hibernate")
-        if t.yes("  유휴 세션 자동 재우기를 켤까요?", hib["enabled"]):
-            m = t.ask(f"  몇 분 쉬면 재울까요? [{hib['idleMin']:g}]: ", str(hib["idleMin"]))
+        if t.yes("  " + L("Hibernate idle sessions automatically?", "유휴 세션 자동 재우기를 켤까요?"), hib["enabled"]):
+            m = t.ask("  " + L("After how many idle minutes?", "몇 분 쉬면 재울까요?") + f" [{hib['idleMin']:g}]: ",
+                      str(hib["idleMin"]))
             try:
                 idle = max(5.0, float(m))
             except ValueError:
                 idle = float(hib["idleMin"])
             cfg = st.config()
-            cfg["hibernate"] = {**(cfg.get("hibernate") or {}), "enabled": True, "idleMin": idle}
-            _write_json(st.config_path(), cfg)
-            w("  → 켰습니다" if register_hib(exe) else f"  {YEL}→ 켰지만 launchd 등록에 실패했습니다 (HUD 에 ⚠ 로 보입니다){R}")
+            save_config(hibernate={**(cfg.get("hibernate") or {}), "enabled": True, "idleMin": idle})
+            w("  → " + L("on", "켰습니다") if register_hib(exe) else
+              f"  {YEL}→ " + L("on, but registering the launchd agent failed (the HUD shows ⚠)",
+                               "켰지만 launchd 등록에 실패했습니다 (HUD 에 ⚠ 로 보입니다)") + R)
         else:
             cfg = st.config()
-            cfg["hibernate"] = {**(cfg.get("hibernate") or {}), "enabled": False}
-            _write_json(st.config_path(), cfg)
+            save_config(hibernate={**(cfg.get("hibernate") or {}), "enabled": False})
             unregister_hib()
-            w("  → 껐습니다 (/sleep 으로 직접 재우기는 됩니다)")
+            w("  → " + L("off (/sleep still works any time)", "껐습니다 (/sleep 으로 직접 재우기는 됩니다)"))
 
         # 4) 한도 자동 스왑
-        w(f"\n{BOLD}4. 한도 도달 시 자동 스왑{R} {DIM}— 5h·주간 한도에 걸리면 여유 있는 계정으로 스왑을 예약합니다{R}")
-        w(f"  {YEL}여러 계정으로 사용 한도를 넘나드는 게 Anthropic 약관에 맞는지는 직접 확인하세요.{R}")
+        w("\n" + BOLD + L("4. Auto-swap on rate limits", "4. 한도 도달 시 자동 스왑") + R + " " + DIM
+          + L("— when you hit the 5h or weekly limit, schedules a swap to an account with room left",
+              "— 5h·주간 한도에 걸리면 여유 있는 계정으로 스왑을 예약합니다") + R)
+        w(f"  {YEL}" + L("Check for yourself whether using several accounts around usage limits fits Anthropic's terms.",
+                         "여러 계정으로 사용 한도를 넘나드는 게 Anthropic 약관에 맞는지는 직접 확인하세요.") + R)
         lim = st.feature("onLimit")
-        on = t.yes("  켤까요?", lim["enabled"])
+        on = t.yes("  " + L("Turn it on?", "켤까요?"), lim["enabled"])
         cfg = st.config()
-        cfg["onLimit"] = {**(cfg.get("onLimit") or {}), "enabled": on}
-        _write_json(st.config_path(), cfg)
-        w("  → 켰습니다" if on else "  → 껐습니다 (/swap 으로 직접 바꾸기는 됩니다)")
+        save_config(onLimit={**(cfg.get("onLimit") or {}), "enabled": on})
+        w("  → " + (L("on", "켰습니다") if on else L("off (/swap still works any time)", "껐습니다 (/swap 으로 직접 바꾸기는 됩니다)")))
 
         # 5) 따로 깔린 claude-swap
         if _separate_claude_swap():
-            w(f"\n{BOLD}5. claude-swap{R} {DIM}— 따로 설치된 claude-swap 이 있습니다. 계정 데이터는 그대로 씁니다{R}")
-            if t.yes("  정리하고 cc-baton 에 들어 있는 버전을 쓸까요?", True):
+            w("\n" + BOLD + "5. claude-swap" + R + " " + DIM
+              + L("— you have claude-swap installed separately. Your account data stays as it is",
+                  "— 따로 설치된 claude-swap 이 있습니다. 계정 데이터는 그대로 씁니다") + R)
+            if t.yes("  " + L("Remove it and use the version bundled with cc-baton?", "정리하고 cc-baton 에 들어 있는 버전을 쓸까요?"), True):
                 ok = subprocess.run(["uv", "tool", "uninstall", "claude-swap"], capture_output=True).returncode == 0
                 if ok:
                     link_cswap()
-                    w(f"  → 정리했습니다. cswap 은 이제 cc-baton 에 들어 있는 claude-swap {_bundled_version()} 입니다")
+                    v = _bundled_version()
+                    w("  → " + L(f"Done. cswap is now the claude-swap {v} bundled with cc-baton",
+                                 f"정리했습니다. cswap 은 이제 cc-baton 에 들어 있는 claude-swap {v} 입니다"))
                 else:
-                    w("  → 정리하지 못했습니다. 직접: uv tool uninstall claude-swap")
+                    w("  → " + L("Couldn't remove it. Run: uv tool uninstall claude-swap",
+                                 "정리하지 못했습니다. 직접: uv tool uninstall claude-swap"))
 
-        cfg = st.config()
-        cfg["setup"] = {"done": True, "at": time.time()}
-        _write_json(st.config_path(), cfg)
-        w(f"\n{GRN}✓{R} 설정 끝. 바꾸려면 {BOLD}cc-baton setup{R}, 기능 하나만은 {BOLD}cc-baton toggle{R}\n")
+        save_config(setup={"done": True, "at": time.time()})
+        _refresh_hook_messages(exe)
+        w(f"\n{GRN}✓{R} " + L(f"All set. Change things with {BOLD}cc-baton setup{R}, or one feature with {BOLD}cc-baton toggle{R}",
+                              f"설정 끝. 바꾸려면 {BOLD}cc-baton setup{R}, 기능 하나만은 {BOLD}cc-baton toggle{R}") + "\n")
         return 0
     except (EOFError, KeyboardInterrupt):
-        w(f"\n{DIM}설정을 멈췄습니다. 다음 baton 실행 때 다시 묻습니다.{R}")
+        w("\n" + DIM + L("Setup stopped. It will ask again next time you run baton.",
+                         "설정을 멈췄습니다. 다음 baton 실행 때 다시 묻습니다.") + R)
         return 1
+
+
+def _refresh_hook_messages(exe):
+    """훅의 statusMessage 는 설치 때 언어로 박힌다. 언어를 바꾸면 다시 맞춘다."""
+    try:
+        s = Settings()
+    except json.JSONDecodeError:
+        return
+    merge_hooks(s.data, exe)
+    s.save()
 
 
 # ── uninstall ────────────────────────────────────────────────────────────
@@ -467,7 +532,8 @@ def cmd_uninstall(argv):
     try:
         s = Settings()
     except json.JSONDecodeError as e:
-        say(f"{RED}✗{R} {SETTINGS} 가 올바른 JSON 이 아니라 손대지 않았습니다 ({e}).")
+        say(f"{RED}✗{R} " + L(f"{SETTINGS} isn't valid JSON, so it was left alone ({e}).",
+                              f"{SETTINGS} 가 올바른 JSON 이 아니라 손대지 않았습니다 ({e})."))
         return 1
     inst = _read_json(INSTALL_STATE, {})
     report = []
@@ -476,52 +542,59 @@ def cmd_uninstall(argv):
     if cur and _ours(cur.get("command") if isinstance(cur, dict) else cur):
         if inst.get("prevStatusLine"):
             s.data["statusLine"] = inst["prevStatusLine"]
-            report.append("HUD: 원래 statusline 으로 되돌림")
+            report.append(L("HUD: your previous statusline is back", "HUD: 원래 statusline 으로 되돌림"))
         else:
             del s.data["statusLine"]
-            report.append("HUD: 뺌")
+            report.append(L("HUD: removed", "HUD: 뺌"))
     backup = s.save()
-    report.append("settings.json: " + (f"우리 훅 제거 ({backup})" if backup else "변경 없음"))
+    report.append("settings.json: " + (L(f"our hooks removed ({backup})", f"우리 훅 제거 ({backup})") if backup
+                                       else L("no change", "변경 없음")))
 
     for f in sorted(COMMANDS_DIR.glob("*.md")) if COMMANDS_DIR.exists() else []:
         if (f.is_symlink() and "cc-baton" in os.readlink(f)) or (f.exists() and CMD_MARK in f.read_text()):
             f.unlink()
-            report.append(f"명령 {f.name}: 제거")
+            report.append(L(f"command {f.name}: removed", f"명령 {f.name}: 제거"))
     if ZSHRC.exists():
         text = ZSHRC.read_text()
         new = _strip_block(text)
         if new != text:
             ZSHRC.write_text(new.rstrip("\n") + "\n")
-            report.append("~/.zshrc 블록: 제거 (열려 있는 셸은 새로 열면 반영)")
+            report.append(L("~/.zshrc block: removed (open shells change once reopened)",
+                            "~/.zshrc 블록: 제거 (열려 있는 셸은 새로 열면 반영)"))
     if unregister_hib():
-        report.append("절전 launchd: 해제")
+        report.append(L("hibernate launchd agent: removed", "절전 launchd: 해제"))
 
     link = Path.home() / ".local" / "bin" / "cswap"
     bundled = Path(sys.executable).parent / "cswap"
     if link.is_symlink() and bundled.exists() and link.resolve() == bundled.resolve():
         link.unlink()
-        if ask("claude-swap(cswap) 은 계속 쓰시겠어요? 따로 다시 설치해 둡니다.", False):
+        if ask(L("Keep using claude-swap (cswap)? It will be installed on its own.",
+                 "claude-swap(cswap) 은 계속 쓰시겠어요? 따로 다시 설치해 둡니다."), False):
             ok = subprocess.run(["uv", "tool", "install", "claude-swap>=0.25,<0.27"], capture_output=True).returncode == 0
-            report.append("cswap: 따로 설치" if ok else "cswap: 설치 실패 (uv tool install claude-swap)")
+            report.append(L("cswap: installed on its own", "cswap: 따로 설치") if ok
+                          else L("cswap: install failed (uv tool install claude-swap)", "cswap: 설치 실패 (uv tool install claude-swap)"))
         else:
-            report.append("cswap: 제거 (계정 데이터 ~/.claude-swap-backup 은 그대로)")
+            report.append(L("cswap: removed (account data in ~/.claude-swap-backup is kept)",
+                            "cswap: 제거 (계정 데이터 ~/.claude-swap-backup 은 그대로)"))
 
-    if purge or ask("설정·기록(계정 그룹, 상태, 절전 로그)까지 지울까요?", False):
+    if purge or ask(L("Also delete settings and state (account groups, state, hibernate log)?",
+                      "설정·기록(계정 그룹, 상태, 절전 로그)까지 지울까요?"), False):
         for p in (st.CONFIG_PATH.parent, st.STATE_DIR, *st.LEGACY_STATE):
             if p.is_symlink():
                 p.unlink()
             elif p.exists():
                 shutil.rmtree(p)
-        report.append("설정·기록: 삭제")
+        report.append(L("settings and state: deleted", "설정·기록: 삭제"))
     else:
-        report.append(f"설정·기록: 남김 ({st.CONFIG_PATH.parent})")
+        report.append(L(f"settings and state: kept ({st.CONFIG_PATH.parent})", f"설정·기록: 남김 ({st.CONFIG_PATH.parent})"))
 
-    say(f"{GRN}✓{R} cc-baton 연결 제거")
+    say(f"{GRN}✓{R} " + L("cc-baton wiring removed", "cc-baton 연결 제거"))
     for line in report:
         say(f"  {DIM}·{R} {line}")
-    if "--keep-package" not in argv and ask("cc-baton 패키지도 지울까요?", True):
+    if "--keep-package" not in argv and ask(L("Remove the cc-baton package too?", "cc-baton 패키지도 지울까요?"), True):
         rc = subprocess.run(["uv", "tool", "uninstall", "cc-baton"], capture_output=True).returncode
-        say(f"  {DIM}·{R} 패키지: " + ("삭제" if rc == 0 else "삭제 실패 — uv tool uninstall cc-baton"))
+        say(f"  {DIM}·{R} " + (L("package: removed", "패키지: 삭제") if rc == 0
+                               else L("package: removal failed, run uv tool uninstall cc-baton", "패키지: 삭제 실패 — uv tool uninstall cc-baton")))
     return 0
 
 

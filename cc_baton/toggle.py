@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
-"""기능 스위치. 값의 원본은 ~/.config/cc-baton/config.json, HUD 3행이 이걸 보여준다.
-
-  cc-baton toggle                        현황
-  cc-baton toggle update|hib|swap on|off 켜기/끄기
-  cc-baton toggle is-on update|hib|swap  스크립트용 (exit 0 = 켜짐)
-
-  update  cc 실행·스왑 직전 Claude Code 최신화 (cc-baton update)
-  hib     유휴 세션 자동 재우기 (cc-baton hib tick). /sleep 수동 재우기는 끄지 않는다
-  swap    한도 도달 시 다른 계정으로 자동 스왑 예약 (cc-baton swap hook limit)
-"""
+"""기능 스위치. 값의 원본은 ~/.config/cc-baton/config.json, HUD 3행이 이걸 보여준다."""
 import json
 import os
 import sys
 from pathlib import Path
 
 from . import state as st
+from .i18n import L
+
+USAGE_EN = """cc-baton toggle                          show switches
+cc-baton toggle update|hib|swap on|off   turn one on or off
+cc-baton toggle is-on update|hib|swap    for scripts (exit 0 = on)
+
+  update  update Claude Code before each launch and swap (npm install only)
+  hib     hibernate idle sessions automatically (manual /sleep always works)
+  swap    schedule a swap to another account when you hit a rate limit"""
+USAGE_KO = """cc-baton toggle                          현황
+cc-baton toggle update|hib|swap on|off   켜기/끄기
+cc-baton toggle is-on update|hib|swap    스크립트용 (exit 0 = 켜짐)
+
+  update  실행·스왑 직전 Claude Code 최신화 (npm 설치본만)
+  hib     유휴 세션 자동 재우기 (/sleep 수동 재우기는 끄지 않는다)
+  swap    한도 도달 시 다른 계정으로 자동 스왑 예약"""
 
 KEYS = {"update": "autoUpdate", "hib": "hibernate", "swap": "onLimit"}
 
@@ -37,7 +44,7 @@ def main(argv=None):
     if len(argv) == 2 and argv[0] in KEYS and argv[1] in ("on", "off"):
         set_enabled(KEYS[argv[0]], argv[1] == "on")
     elif argv:
-        print(__doc__.strip(), file=sys.stderr)
+        print(L(USAGE_EN, USAGE_KO), file=sys.stderr)
         return 1
     for name, key in KEYS.items():
         print(f"{name:<7} {'on' if st.feature(key)['enabled'] else 'off'}")

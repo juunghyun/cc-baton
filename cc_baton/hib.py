@@ -35,6 +35,17 @@ import time
 from pathlib import Path
 
 from . import state as st
+from .i18n import L
+
+
+def vtxt(v):
+    """판정 값(내부는 한국어 그대로) → 화면 문구."""
+    return L("sleep", "재우기") if v == "재우기" else L("skip", "제외")
+
+
+def otxt(o):
+    """출처 값(재움 = 우리가 재움, 끊김 = 재부팅 등으로 끊김) → 화면 문구."""
+    return L("slept", "재움") if o == "재움" else L("lost", "끊김")
 
 # launchd 로그로 갈 땐 색을 빼야 읽힌다.
 if sys.stdout.isatty() or sys.stderr.isatty():
@@ -213,7 +224,7 @@ def mem_pressure():
 def idle_threshold():
     free, swap = mem_pressure()
     if (free is not None and free < 25) or swap > 512:
-        return IDLE_MIN_PRESSURE, f"메모리 압박(여유 {free}%, 스왑 {swap:.0f}MB)"
+        return IDLE_MIN_PRESSURE, L(f"memory pressure (free {free}%, swap {swap:.0f}MB)", f"메모리 압박(여유 {free}%, 스왑 {swap:.0f}MB)")
     return float(st.feature("hibernate")["idleMin"]), None  # 유휴 임계(분), config.json
 
 
@@ -261,9 +272,9 @@ def blockers(recs, now):
         if uid in results:
             continue
         if name == "Monitor":
-            out.append("Monitor 미완료")
+            out.append(L("Monitor still running", "Monitor 미완료"))
         elif name == "Bash" and inp.get("run_in_background"):
-            out.append("백그라운드 Bash 미완료")
+            out.append(L("background Bash still running", "백그라운드 Bash 미완료"))
     if wakeup:
         ts, inp = wakeup
         if not inp.get("stop") and ts:
@@ -271,15 +282,15 @@ def blockers(recs, now):
                 t0 = datetime.datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
                 left = (t0 + float(inp.get("delaySeconds") or 0)) - now
                 if left > -300:
-                    out.append(f"ScheduleWakeup 예약 {left / 60:+.0f}분")
+                    out.append(L(f"ScheduleWakeup due {left / 60:+.0f}m", f"ScheduleWakeup 예약 {left / 60:+.0f}분"))
             except Exception:
-                out.append("ScheduleWakeup 예약(시각 불명)")
+                out.append(L("ScheduleWakeup scheduled (time unknown)", "ScheduleWakeup 예약(시각 불명)"))
     if ledger:
         # 아티팩트가 있다는 것만으론 제외하지 않는다. resume 하면 watch 는 대체로 복구된다.
         # 실제로 코멘트 스레드가 오가는 중일 때만 하드로 올린다.
         for aid, info in (ledger.get("artifacts") or {}).items():
             if info.get("threads"):
-                out.append(f"아티팩트 코멘트 스레드 {len(info['threads'])}건")
+                out.append(L(f"{len(info['threads'])} artifact comment thread(s)", f"아티팩트 코멘트 스레드 {len(info['threads'])}건"))
     return sorted(set(out))
 
 
@@ -318,26 +329,27 @@ def verdict(row, now, idle_min_th):
     if row["status"] != "idle":
         return "제외", f"status={row['status']}"
     if row["idle_min"] < idle_min_th:
-        return "제외", f"유휴 {row['idle_min']:.0f}분 < {idle_min_th:.0f}분"
+        return "제외", L(f"idle {row['idle_min']:.0f}m < {idle_min_th:.0f}m", f"유휴 {row['idle_min']:.0f}분 < {idle_min_th:.0f}분")
     if not row["transcript"]:
-        return "제외", "트랜스크립트 없음"
+        return "제외", L("no transcript", "트랜스크립트 없음")
     b = blockers(tail_records(row["transcript"]), now)
     if b:
         return "제외", ", ".join(b)
     if not cap_ok(row["tty"]):
-        return "제외", "래퍼 미지원 — 탭을 새로 열어야 적용됨"
-    return "재우기", f"유휴 {row['idle_min']:.0f}분"
+        return "제외", L("tab not running baton (open a new tab to enable)", "래퍼 미지원 — 탭을 새로 열어야 적용됨")
+    return "재우기", L(f"idle {row['idle_min']:.0f}m", f"유휴 {row['idle_min']:.0f}분")
 
 
 # ── 명령 ─────────────────────────────────────────────────────────────
 def cmd_scan(argv):
     th, why = idle_threshold()
     if "--idle" in argv:
-        th = float(argv[argv.index("--idle") + 1]); why = "수동 지정"
+        th = float(argv[argv.index("--idle") + 1]); why = L("set by hand", "수동 지정")
     rows, lp, now = sessions()
     unreg = sorted(set(lp) - {r["pid"] for r in rows})
-    print(f"{BOLD}임계 {th:.0f}분{R}" + (f" {YEL}({why}){R}" if why else ""))
-    print(f"{'판정':<8} {'pid':>7} {'status':<7} {'유휴분':>7} {'RSS':>7} {'name':<15} 사유")
+    print(BOLD + L(f"threshold {th:.0f}m", f"임계 {th:.0f}분") + R + (f" {YEL}({why}){R}" if why else ""))
+    print(f"{L('verdict', '판정'):<8} {'pid':>7} {'status':<7} {L('idle m', '유휴분'):>7} {'RSS':>7} {'name':<15} "
+          + L("reason", "사유"))
     print("─" * 104)
     out = []
     for r in sorted(rows, key=lambda x: -x["idle_min"]):
@@ -346,13 +358,15 @@ def cmd_scan(argv):
     for v, r, w in sorted(out, key=lambda t: (t[0] != "재우기", -t[1]["idle_min"])):
         c = GRN if v == "재우기" else DIM
         mark = "★" if v == "재우기" else " "
-        print(f"{c}{mark}{v:<7}{R} {r['pid']:>7} {r['status'] or '?':<7} "
+        print(f"{c}{mark}{vtxt(v):<7}{R} {r['pid']:>7} {r['status'] or '?':<7} "
               f"{r['idle_min']:>7.1f} {r['rss']:>5}MB {str(r['name'])[:15]:<15} {w}")
     n = sum(1 for v, _, _ in out if v == "재우기")
     save = sum(r["rss"] for v, r, _ in out if v == "재우기")
-    print(f"\n대상 {n}개 / 전체 {len(out)}개" + (f"  → 회수 예상 {save}MB" if n else ""))
+    print("\n" + L(f"{n} to sleep / {len(out)} total", f"대상 {n}개 / 전체 {len(out)}개")
+          + (L(f"  → frees about {save}MB", f"  → 회수 예상 {save}MB") if n else ""))
     if unreg:
-        print(f"{DIM}레지스트리 없는 살아있는 pid {unreg} — 식별 불가라 건드리지 않음{R}")
+        print(DIM + L(f"live pids without a session record {unreg}: can't identify them, left alone",
+                      f"레지스트리 없는 살아있는 pid {unreg} — 식별 불가라 건드리지 않음") + R)
     return out
 
 
@@ -370,9 +384,10 @@ def tty_note(row):
     tty 에 직접 쓰면 TUI 를 건드리지 않고 프롬프트 옆에 찍힌다(검증됨)."""
     try:
         with open(f"/dev/{row['tty']}", "w") as t:
-            t.write(f"\n  \033[38;5;170m💤 이 세션은 메모리 회수를 위해 재워졌습니다\033[0m"
-                    f"  \033[2m({row['rss']}MB)\033[0m\n"
-                    f"  \033[2m대화는 그대로입니다. 돌아가려면:\033[0m cc-baton hib wake\n\n")
+            t.write("\n  \033[38;5;170m💤 " + L("This session was hibernated to free memory", "이 세션은 메모리 회수를 위해 재워졌습니다")
+                    + f"\033[0m  \033[2m({row['rss']}MB)\033[0m\n"
+                    + "  \033[2m" + L("The conversation is intact. To come back:", "대화는 그대로입니다. 돌아가려면:")
+                    + "\033[0m cc-baton hib wake\n\n")
     except OSError:
         pass                                    # 탭이 이미 닫혔으면 그만
 
@@ -390,9 +405,9 @@ def do_sleep(row, reason, selfkill=False):
     except ProcessLookupError:
         (REQ / f"{row['tty']}.json").unlink(missing_ok=True)
         (PARKED / f"{row['sid']}.json").unlink(missing_ok=True)
-        return False, "이미 종료됨"
+        return False, L("already exited", "이미 종료됨")
     if selfkill:
-        return True, f"{row['rss']}MB 회수 (이 세션)"   # 내가 곧 같이 죽는다. 기다리지 않는다.
+        return True, L(f"freed {row['rss']}MB (this session)", f"{row['rss']}MB 회수 (이 세션)")   # 내가 곧 같이 죽는다. 기다리지 않는다.
     for _ in range(100):
         time.sleep(0.1)
         try:
@@ -400,14 +415,14 @@ def do_sleep(row, reason, selfkill=False):
         except ProcessLookupError:
             if not cap_ok(row["tty"]):
                 tty_note(row)
-            return True, f"{row['rss']}MB 회수"
+            return True, L(f"freed {row['rss']}MB", f"{row['rss']}MB 회수")
     try:
         os.kill(row["pid"], 9)
     except Exception:
         pass
     if not cap_ok(row["tty"]):
         tty_note(row)
-    return True, f"{row['rss']}MB 회수 (SIGKILL 에스컬레이션)"
+    return True, L(f"freed {row['rss']}MB (escalated to SIGKILL)", f"{row['rss']}MB 회수 (SIGKILL 에스컬레이션)")
 
 
 def cmd_tick(argv):
@@ -431,14 +446,14 @@ def cmd_tick(argv):
             continue
         if row["status"] != "idle" or row["idle_min"] < p.get("idleAtRequest", 0) - 0.5:
             f.unlink(missing_ok=True)                       # 사용자가 돌아옴 → 취소
-            acted.append(f"{row['name']} 유예 취소(활동 재개)")
+            acted.append(L(f"{row['name']} grace cancelled (active again)", f"{row['name']} 유예 취소(활동 재개)"))
             continue
         if time.time() >= p.get("dueAt", 0):
             ok, msg = do_sleep(row, p.get("reason", ""))
             f.unlink(missing_ok=True)
             slept.add(row["tty"])
-            acted.append(f"{row['name']} 재움 — {msg}")
-            notify("세션 재움", f"{row['name']} · {row['cwd'].split('/')[-1]} — {msg}")
+            acted.append(L(f"{row['name']} hibernated: {msg}", f"{row['name']} 재움 — {msg}"))
+            notify(L("Session hibernated", "세션 재움"), f"{row['name']} · {row['cwd'].split('/')[-1]} — {msg}")
 
     # 2) 새 후보에 유예 걸기
     pending_ttys = {(_load(f) or {}).get("tty") for f in PENDING.glob("*.json")}
@@ -451,10 +466,11 @@ def cmd_tick(argv):
         _save(PENDING / f"{r['tty']}.json", {
             "tty": r["tty"], "sid": r["sid"], "name": r["name"], "reason": w,
             "dueAt": time.time() + GRACE_SEC, "idleAtRequest": r["idle_min"]})
-        acted.append(f"{r['name']} 유예 시작({GRACE_SEC/60:.0f}분 뒤 재움)")
-        notify("세션 재우기 예고",
-               f"{r['name']} · {r['cwd'].split('/')[-1]} — {GRACE_SEC/60:.0f}분 뒤 재웁니다. "
-               f"그 탭에서 아무거나 입력하면 취소됩니다.")
+        acted.append(L(f"{r['name']} grace started (hibernates in {GRACE_SEC/60:.0f}m)", f"{r['name']} 유예 시작({GRACE_SEC/60:.0f}분 뒤 재움)"))
+        notify(L("Session about to hibernate", "세션 재우기 예고"),
+               f"{r['name']} · {r['cwd'].split('/')[-1]} — "
+               + L(f"hibernates in {GRACE_SEC/60:.0f}m. Type anything in that tab to cancel.",
+                   f"{GRACE_SEC/60:.0f}분 뒤 재웁니다. 그 탭에서 아무거나 입력하면 취소됩니다."))
     snapshot(rows)
 
     # 소비되지 않은 재우기 요청 정리. 옛 래퍼 탭은 claim 을 호출하지 않아 그냥 남는다.
@@ -466,7 +482,8 @@ def cmd_tick(argv):
     for a in acted:
         print(a)
     if not acted:
-        print(f"{DIM}변화 없음 (임계 {th:.0f}분" + (f", {why}" if why else "") + f", 세션 {len(rows)}개){R}")
+        print(DIM + L(f"no change (threshold {th:.0f}m", f"변화 없음 (임계 {th:.0f}분") + (f", {why}" if why else "")
+              + L(f", {len(rows)} sessions)", f", 세션 {len(rows)}개)") + R)
 
 
 def ancestors():
@@ -517,57 +534,61 @@ def cmd_sleep(argv):
         for r in sorted(rows, key=lambda x: -x["idle_min"]):
             if r["status"] != "idle" or r["idle_min"] < th:
                 continue
-            b = blockers(tail_records(r["transcript"]), now) if r["transcript"] else ["트랜스크립트 없음"]
+            b = blockers(tail_records(r["transcript"]), now) if r["transcript"] else [L("no transcript", "트랜스크립트 없음")]
             if b and not force:
                 skipped.append((r, ", ".join(b))); continue
             if not cap_ok(r["tty"]) and not force:
-                skipped.append((r, "래퍼 미지원 — 탭이 프롬프트로 떨어짐")); continue
+                skipped.append((r, L("tab not running baton (would drop to the shell)", "래퍼 미지원 — 탭이 프롬프트로 떨어짐"))); continue
             targets.append(r)
         if not targets:
-            print(f"{DIM}유휴 {th:.0f}분 이상인 재울 대상이 없습니다.{R}")
+            print(DIM + L(f"No sessions idle for {th:.0f}m or more.", f"유휴 {th:.0f}분 이상인 재울 대상이 없습니다.") + R)
         for r in targets:
             if dry:
-                print(f"{DIM}[dry]{R} {r['name']} ({r['pid']}, {r['rss']}MB, 유휴 {r['idle_min']:.0f}분)")
+                print(f"{DIM}[dry]{R} {r['name']} ({r['pid']}, {r['rss']}MB, " + L(f"idle {r['idle_min']:.0f}m)", f"유휴 {r['idle_min']:.0f}분)"))
                 continue
-            ok, msg = do_sleep(r, f"수동 일괄 {th:.0f}분", selfkill=(r["pid"] == me))
+            ok, msg = do_sleep(r, L(f"manual batch {th:.0f}m", f"수동 일괄 {th:.0f}분"), selfkill=(r["pid"] == me))
             print(f"{GRN}✓{R} {r['name']} — {msg}" if ok else f"{RED}✗{R} {r['name']}: {msg}")
         if targets and not dry:
-            print(f"\n{len(targets)}개 재움 · {sum(r['rss'] for r in targets)}MB 회수")
+            print("\n" + L(f"{len(targets)} hibernated · freed {sum(r['rss'] for r in targets)}MB",
+                   f"{len(targets)}개 재움 · {sum(r['rss'] for r in targets)}MB 회수"))
         for r, why in skipped:
-            print(f"{DIM}건너뜀 {r['name']} — {why}{R}")
+            print(DIM + L(f"skipped {r['name']}: {why}", f"건너뜀 {r['name']} — {why}") + R)
         if skipped and not force:
-            print(f"{DIM}포함하려면 --force{R}")
+            print(DIM + L("add --force to include them", "포함하려면 --force") + R)
         return 0
 
     row, token = resolve(pos[0] if pos else None, rows)
     if not row:
         if token == "self":
-            print(f"{RED}✗{R} 지금 들어있는 세션을 못 찾았습니다. pid 나 이름을 주세요.", file=E)
+            print(f"{RED}✗{R} " + L("Couldn't find the current session. Give a pid or a name.", "지금 들어있는 세션을 못 찾았습니다. pid 나 이름을 주세요."), file=E)
         else:
-            print(f"{RED}✗{R} '{token}' 에 맞는 세션이 없습니다. cc-baton hib scan 으로 확인하세요.", file=E)
+            print(f"{RED}✗{R} " + L(f"No session matches '{token}'. Check with cc-baton hib scan.", f"'{token}' 에 맞는 세션이 없습니다. cc-baton hib scan 으로 확인하세요."), file=E)
         return 1
 
-    b = blockers(tail_records(row["transcript"]), now) if row["transcript"] else ["트랜스크립트 없음"]
+    b = blockers(tail_records(row["transcript"]), now) if row["transcript"] else [L("no transcript", "트랜스크립트 없음")]
     if b and not force:
-        print(f"{YEL}!{R} {row['name']}: {', '.join(b)} — 재우면 잃습니다. 그래도 재우려면 --force", file=E)
+        print(f"{YEL}!{R} {row['name']}: {', '.join(b)} — " + L("hibernating now would lose it. Use --force to do it anyway",
+                                                              "재우면 잃습니다. 그래도 재우려면 --force"), file=E)
         return 1
     if b:
-        print(f"{YEL}!{R} 차단신호 무시하고 진행: {', '.join(b)}", file=E)
+        print(f"{YEL}!{R} " + L(f"going ahead despite: {', '.join(b)}", f"차단신호 무시하고 진행: {', '.join(b)}"), file=E)
     if not cap_ok(row["tty"]) and not force:
-        print(f"{YEL}!{R} {row['name']}: 이 탭은 대기 배너를 못 띄웁니다(셸 프롬프트로 떨어짐).", file=E)
-        print(f"  {DIM}대화는 안전하고 cc-baton hib wake 로 돌아옵니다. 그래도 재우려면 --force{R}", file=E)
+        print(f"{YEL}!{R} {row['name']}: " + L("this tab isn't running baton, so it will drop to the shell prompt.",
+                                               "이 탭은 대기 배너를 못 띄웁니다(셸 프롬프트로 떨어짐)."), file=E)
+        print(f"  {DIM}" + L("The conversation is safe; cc-baton hib wake brings it back. Use --force to go ahead",
+                             "대화는 안전하고 cc-baton hib wake 로 돌아옵니다. 그래도 재우려면 --force") + R, file=E)
         return 1
     if dry:
-        print(f"{DIM}[dry]{R} {row['name']} ({row['pid']}, {row['rss']}MB) 를 재웁니다")
+        print(f"{DIM}[dry]{R} " + L(f"would hibernate {row['name']} ({row['pid']}, {row['rss']}MB)", f"{row['name']} ({row['pid']}, {row['rss']}MB) 를 재웁니다"))
         return 0
 
     selfk = (row["pid"] == me) or (row["pid"] in set(ancestors()))
     if selfk:
-        print(f"{MAG}💤{R} 이 세션을 재웁니다 — {row['rss']}MB. "
-              f"{DIM}깨우려면 이 탭에서 키를 누르거나 cc-baton hib wake{R}")
-    ok, msg = do_sleep(row, "수동", selfkill=selfk)
+        print(f"{MAG}💤{R} " + L(f"Hibernating this session ({row['rss']}MB). ", f"이 세션을 재웁니다 — {row['rss']}MB. ")
+              + DIM + L("Press any key in this tab or run cc-baton hib wake to come back", "깨우려면 이 탭에서 키를 누르거나 cc-baton hib wake") + R)
+    ok, msg = do_sleep(row, L("manual", "수동"), selfkill=selfk)
     if not selfk:
-        print(f"{GRN}✓{R} {row['name']} 재움 — {msg}" if ok else f"{RED}✗{R} {msg}")
+        print(f"{GRN}✓{R} " + L(f"{row['name']} hibernated: {msg}", f"{row['name']} 재움 — {msg}") if ok else f"{RED}✗{R} {msg}")
     return 0 if ok else 1
 
 
@@ -597,9 +618,10 @@ def cmd_banner(argv):
     # 탭 제목. claude 가 죽으면 탭이 'zsh' 로 돌아가 어느 세션인지 모른다. 깨우면 claude 가 다시 덮어쓴다.
     print(f"\033]0;⏾ {name}\007", end="")
     print()
-    print(f"  {MAG}💤 재움{R}  {BOLD}{name}{R}  {DIM}{cwd}{R}")
-    print(f"  {DIM}{when} · {rss}MB 회수 · 맥락은 그대로 보존됨{R}")
-    print(f"  {CYA}아무 키나 누르면 이어서 시작합니다{R} {DIM}(Ctrl-C 로 탭 종료){R}")
+    print(f"  {MAG}💤 " + L("Hibernated", "재움") + f"{R}  {BOLD}{name}{R}  {DIM}{cwd}{R}")
+    print(f"  {DIM}{when} · " + L(f"freed {rss}MB · conversation kept as is", f"{rss}MB 회수 · 맥락은 그대로 보존됨") + R)
+    print(f"  {CYA}" + L("Press any key to pick up where you left off", "아무 키나 누르면 이어서 시작합니다") + f"{R} {DIM}"
+          + L("(Ctrl-C closes the tab)", "(Ctrl-C 로 탭 종료)") + R)
     print()
     return 0
 
@@ -607,8 +629,9 @@ def cmd_banner(argv):
 def cmd_wake(argv):
     sid = argv[0] if argv else ""
     f = PARKED / f"{sid}.json"
-    if not f.exists():
-        return 1                                            # 다른 데서 이미 깨움
+    if not f.exists():                                      # 다른 데서 이미 깨움
+        print("  " + L("This session was already woken somewhere else.", "이 세션은 다른 곳에서 이미 깨어났습니다."))
+        return 1
     f.unlink(missing_ok=True)
     return 0
 
@@ -666,15 +689,15 @@ def cmd_list(argv):
         print(json.dumps(items, ensure_ascii=False))
         return 0
     if not items:
-        print(f"{DIM}재운 세션 없음{R}")
+        print(DIM + L("No hibernated sessions", "재운 세션 없음") + R)
         return 0
-    print(f"{'':>3} {'출처':<5} {'언제':<7} {'name':<15} {'계정':<4} cwd")
+    print(f"{'':>3} {L('from', '출처'):<5} {L('when', '언제'):<7} {'name':<15} {L('acct', '계정'):<4} cwd")
     print("─" * 92)
     for i, d in enumerate(items, 1):
         when = (datetime.datetime.fromtimestamp(d["hibernatedAt"]).strftime("%m-%d %H:%M")
                 if d.get("hibernatedAt") else "—")
         c = MAG if d["origin"] == "재움" else YEL
-        print(f"{i:>3} {c}{d['origin']:<5}{R} {when:<12} {str(d.get('name'))[:15]:<15} "
+        print(f"{i:>3} {c}{otxt(d['origin']):<5}{R} {when:<12} {str(d.get('name'))[:15]:<15} "
               f"{str(d.get('account') or '-'):<4} {d.get('cwd')}")
     return 0
 
@@ -683,16 +706,16 @@ def cmd_pick(argv):
     """피커. 선택 결과를 'account\\tsid\\tcwd' 로 stdout 에 뱉는다(화면은 stderr)."""
     items = parked_list()
     if not items:
-        print(f"{DIM}재운 세션이 없습니다.{R}", file=E)
+        print(DIM + L("No hibernated sessions.", "재운 세션이 없습니다.") + R, file=E)
         return 1
-    print(f"\n  {BOLD}재운 세션{R}\n", file=E)
+    print(f"\n  {BOLD}" + L("Hibernated sessions", "재운 세션") + f"{R}\n", file=E)
     for i, d in enumerate(items, 1):
         when = (datetime.datetime.fromtimestamp(d["hibernatedAt"]).strftime("%m-%d %H:%M")
                 if d.get("hibernatedAt") else "—")
         c = MAG if d["origin"] == "재움" else YEL
-        print(f"   {BOLD}{i}{R}) {c}{d['origin']}{R} {DIM}{when}{R}  "
+        print(f"   {BOLD}{i}{R}) {c}{otxt(d['origin'])}{R} {DIM}{when}{R}  "
               f"{BOLD}{str(d.get('name'))[:18]}{R}  {DIM}{d.get('cwd')}{R}", file=E)
-    print(f"\n  번호 선택 (Enter 취소): ", end="", file=E, flush=True)
+    print("\n  " + L("Pick a number (Enter to cancel): ", "번호 선택 (Enter 취소): "), end="", file=E, flush=True)
     try:
         s = input().strip()
     except (EOFError, KeyboardInterrupt):
@@ -709,7 +732,7 @@ def cmd_pick(argv):
 def cmd_resume(argv):
     """마커를 걷고 그 자리에서 세션을 되살린다. 목록 번호나 세션 ID 앞부분을 받는다."""
     if not argv:
-        print("사용법: cc-baton hib resume <번호|세션ID>", file=E)
+        print(L("usage: cc-baton hib resume <number|session id>", "사용법: cc-baton hib resume <번호|세션ID>"), file=E)
         return 1
     token = argv[0]
     items = parked_list()
@@ -720,7 +743,7 @@ def cmd_resume(argv):
         hit = [x for x in items if x["sid"].startswith(token)]
         d = hit[0] if len(hit) == 1 else None
     if not d:
-        print(f"{RED}✗{R} '{token}' 에 맞는 세션이 없습니다. cc-baton hib list 로 확인하세요.", file=E)
+        print(f"{RED}✗{R} " + L(f"No session matches '{token}'. Check with cc-baton hib list.", f"'{token}' 에 맞는 세션이 없습니다. cc-baton hib list 로 확인하세요."), file=E)
         return 1
     marker = PARKED / f"{d['sid']}.json"
     saved = _load(marker)
@@ -729,7 +752,7 @@ def cmd_resume(argv):
     if cwd and os.path.isdir(cwd):
         os.chdir(cwd)
     acct = d.get("account")
-    print(f"{MAG}↻{R} {d.get('name')} 복원 — {DIM}{cwd}{R}")
+    print(f"{MAG}↻{R} " + L(f"restoring {d.get('name')}", f"{d.get('name')} 복원") + f" — {DIM}{cwd}{R}")
     try:
         if acct:
             os.execvp("zsh", ["zsh", "-ic", f"cc {acct} -- --resume {d['sid']}"])
@@ -738,7 +761,7 @@ def cmd_resume(argv):
     except OSError as e:
         if saved:
             _save(marker, saved)                # 못 띄웠으면 목록에 도로 올려둔다
-        print(f"{RED}✗{R} 실행 실패: {e}", file=E)
+        print(f"{RED}✗{R} " + L(f"failed to run: {e}", f"실행 실패: {e}"), file=E)
         return 1
 
 
@@ -746,32 +769,33 @@ def cmd_restore(argv):
     """재부팅 뒤처럼 여러 개를 한 번에 되살릴 때. 세션 하나당 탭 하나가 필요하다."""
     items = parked_list()
     if not items:
-        print(f"{DIM}되살릴 세션이 없습니다.{R}")
+        print(DIM + L("Nothing to restore.", "되살릴 세션이 없습니다.") + R)
         return 0
     lines = [f"cc-baton hib resume {i}" for i in range(1, len(items) + 1)]
     if "--script" in argv:
         i = argv.index("--script")
         path = argv[i + 1] if i + 1 < len(argv) else "restore-sessions.sh"
-        body = "#!/bin/zsh\n# 세션 하나당 탭 하나가 필요합니다. 아래를 각 탭에서 한 줄씩 실행하세요.\n"
+        body = "#!/bin/zsh\n# " + L("Each session needs its own tab. Run one line per tab.", "세션 하나당 탭 하나가 필요합니다. 아래를 각 탭에서 한 줄씩 실행하세요.") + "\n"
         for d, ln in zip(items, lines):
             body += f"# {d.get('name')}  {d.get('cwd')}\n# {ln}\n"
         pathlib_write = Path(path)
         pathlib_write.write_text(body)
         os.chmod(path, 0o755)
-        print(f"{GRN}✓{R} {path} 에 {len(items)}개 복원 명령을 적었습니다")
+        print(f"{GRN}✓{R} " + L(f"wrote {len(items)} restore command(s) to {path}", f"{path} 에 {len(items)}개 복원 명령을 적었습니다"))
         return 0
 
-    print(f"\n  {BOLD}되살릴 세션 {len(items)}개{R}  "
-          f"{DIM}— 세션 하나당 탭 하나가 필요합니다{R}\n")
+    print(f"\n  {BOLD}" + L(f"{len(items)} session(s) to restore", f"되살릴 세션 {len(items)}개") + f"{R}  "
+          + DIM + L("— each needs its own tab", "— 세션 하나당 탭 하나가 필요합니다") + f"{R}\n")
     for i, (d, ln) in enumerate(zip(items, lines), 1):
         when = (datetime.datetime.fromtimestamp(d["hibernatedAt"]).strftime("%m-%d %H:%M")
                 if d.get("hibernatedAt") else "—")
         c = MAG if d["origin"] == "재움" else YEL
-        print(f"   {c}{d['origin']}{R} {DIM}{when}{R}  {BOLD}{str(d.get('name'))[:16]:<16}{R} "
+        print(f"   {c}{otxt(d['origin'])}{R} {DIM}{when}{R}  {BOLD}{str(d.get('name'))[:16]:<16}{R} "
               f"{DIM}{d.get('cwd')}{R}")
         print(f"     {CYA}{ln}{R}\n")
-    print(f"  {DIM}탭을 새로 열고 각 줄을 실행하세요. 순서는 상관없습니다.{R}")
-    print(f"  {DIM}파일로 받으려면: cc-baton hib restore --script ~/restore.sh{R}\n")
+    print(f"  {DIM}" + L("Open a new tab for each line and run it. Any order works.", "탭을 새로 열고 각 줄을 실행하세요. 순서는 상관없습니다.") + R)
+    print(f"  {DIM}" + L("To save them to a file: cc-baton hib restore --script ~/restore.sh",
+                         "파일로 받으려면: cc-baton hib restore --script ~/restore.sh") + f"{R}\n")
     return 0
 
 
@@ -783,7 +807,7 @@ def cmd_clean(argv):
         age = time.time() - (d.get("hibernatedAt") or d.get("dueAt", 0) - GRACE_SEC)
         if age > 3600:
             f.unlink(missing_ok=True); n += 1
-    print(f"{n}개 정리")
+    print(L(f"cleaned {n}", f"{n}개 정리"))
     return 0
 
 
@@ -795,7 +819,10 @@ def main():
             "banner": cmd_banner, "wake": cmd_wake, "list": cmd_list, "pick": cmd_pick,
             "clean": cmd_clean, "cap": cmd_cap, "resume": cmd_resume, "restore": cmd_restore}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
-        print(__doc__, file=E)
+        print(L("usage: cc-baton hib scan | tick | sleep [target] [--all [min]] [--dry] [--force] | wake <sid> | list | "
+                "resume <n|sid> | restore [--script P] | pick | clean",
+                "사용법: cc-baton hib scan | tick | sleep [대상] [--all [분]] [--dry] [--force] | wake <sid> | list | "
+                "resume <번호|sid> | restore [--script P] | pick | clean"), file=E)
         return 2
     r = cmds[sys.argv[1]](sys.argv[2:])
     return 0 if r is None or r is True else (r if isinstance(r, int) else 0)

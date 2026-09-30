@@ -1,41 +1,41 @@
 ---
-description: 이 세션을 지금 재운다 — 대화는 그대로 두고 메모리만 회수한다 (cc-baton hib)
-argument-hint: [pid|이름] [--all] [--force] [--dry]
+description: Hibernate this session now; the conversation stays, only the memory is freed (cc-baton)
+argument-hint: [pid|name] [--all] [--force] [--dry]
 allowed-tools: Bash({cc_baton} hib:*)
 ---
 
-`{cc_baton} hib sleep $ARGUMENTS` 를 실행하고 출력을 그대로 사용자에게 전달해라.
+Run `{cc_baton} hib sleep $ARGUMENTS` and show the user its output as is. Reply in the user's language.
 
-인자가 없으면 **지금 이 세션**이 대상이다. 유예도 알림도 없이 즉시 종료된다 — 사용자가 명시적으로 시킨 것이기 때문이다.
+With no argument the target is **this session**. It ends right away, with no grace period or notification, because the user asked for it explicitly.
 
-## 자기 자신을 재우는 경우 (인자 없음)
+## Hibernating yourself (no argument)
 
-프로세스가 곧 죽는다. 그러니:
+The process is about to be killed, so:
 
-- 실행 **전에** 한 줄로 알려라: 무엇을 재우는지, 어떻게 돌아오는지.
-- 실행 **후에는 아무 작업도 시작하지 마라.** 도구를 더 부르지 말고 거기서 멈춰라.
-- 마커는 SIGTERM 보다 먼저 디스크에 쓰이므로, 이 세션이 중간에 죽어도 상태는 온전하다.
+- **Before** running it, say in one line what is being hibernated and how to come back.
+- **After** running it, don't start anything. Make no more tool calls; stop there.
+- The marker is written to disk before SIGTERM, so the state is intact even if this session dies mid-way.
 
-## 종료 코드
+## Exit codes
 
-- **0** — 재움 완료(또는 `--dry` 미리보기). 출력 그대로 전달.
-- **1** — 거부됨. 사유가 출력에 있다. 그대로 보여주고 **네 판단으로 `--force` 를 붙이지 마라.** 사용자가 명시적으로 요구할 때만 재실행해라.
+- **0** — Hibernated (or a `--dry` preview). Relay the output as is.
+- **1** — Refused; the reason is in the output. Show it as is and **never add `--force` on your own.** Re-run only if the user explicitly asks.
 
-거부 사유는 둘 중 하나다.
+The refusal is one of two kinds:
 
-- **차단신호** — 예약된 깨우기, 안 끝난 백그라운드 작업, 코멘트가 오가는 아티팩트. 재우면 잃는다. 무엇을 잃는지 사용자에게 알리고 판단을 받아라.
-- **래퍼 미지원** — 그 탭은 대기 배너를 못 띄워서 셸 프롬프트로 떨어진다. 대화는 안전하고 `cc-baton hib wake` 로 돌아온다. 탭에는 안내가 찍힌다.
+- **Blockers** — a scheduled wakeup, unfinished background work, or an artifact with an active comment thread. Hibernating would lose it. Tell the user what would be lost and let them decide.
+- **Tab not running baton** — that tab can't show the waiting banner and drops to the shell prompt. The conversation is safe and `cc-baton hib wake` brings it back. The tab gets a notice.
 
-## 돌아오는 법
+## Coming back
 
-- 대기 배너가 뜬 탭이면 **아무 키**
-- 그 외에는 어느 터미널에서든 `cc-baton hib wake`
+- In a tab showing the waiting banner: **any key**
+- Anywhere else: `cc-baton hib wake`
 
-## 다른 대상 지정
+## Other targets
 
-- `/sleep 12345` — pid
-- `/sleep workspace-3e` — 이름(앞부분만 써도 됨)
-- `/sleep --all` — 지금 조건에 맞는 유휴 세션 전부. `--all 60` 처럼 임계(분)를 붙일 수 있다
-- `/sleep --dry` — 무엇을 재울지만 보여주고 실행하지 않는다
+- `/sleep 12345` — a pid
+- `/sleep workspace-3e` — a name (a prefix is enough)
+- `/sleep --all` — every idle session that qualifies right now. Add minutes like `--all 60`
+- `/sleep --dry` — show what would be hibernated without doing it
 
-대상이 모호하거나 못 찾으면 `cc-baton hib scan` 결과를 보여주고 사용자에게 물어라.
+If the target is ambiguous or not found, show `cc-baton hib scan` and ask the user.

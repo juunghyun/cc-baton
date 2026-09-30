@@ -20,6 +20,7 @@ import unicodedata
 from pathlib import Path
 
 from . import state as st
+from .i18n import L
 
 R = "\033[0m"
 DIM = "\033[2m"
@@ -220,7 +221,7 @@ def hib_idle_text(cfg_min):
     try:
         d = json.loads((st.STATE_DIR / "hib" / "threshold.json").read_text())
         if time.time() - d["at"] < 600 and d["idleMin"] < cfg_min:
-            return f"{d['idleMin']:g}m 메모리부족"
+            return f"{d['idleMin']:g}m " + L("low memory", "메모리부족")
     except Exception:
         pass
     return f"{cfg_min:g}m"
@@ -230,12 +231,13 @@ def settings_parts(num):
     up, hib, lim = st.feature("autoUpdate"), st.feature("hibernate"), st.feature("onLimit")
     state = lambda on, bad: "off" if not on else ("warn" if bad() else "on")  # noqa: E731
     return [
-        setting("⟳", "업데이트", state(up["enabled"], st.UPDATE_FAILED.exists), warn="실패"),
-        setting("⏾", "절전", state(hib["enabled"], lambda: not hib_loaded()),
-                val=hib_idle_text(hib["idleMin"]), warn="미등록"),
-        setting("⇄", "한도스왑",
+        setting("⟳", L("Update", "업데이트"), state(up["enabled"], st.UPDATE_FAILED.exists), warn=L("failed", "실패")),
+        setting("⏾", L("Sleep", "절전"), state(hib["enabled"], lambda: not hib_loaded()),
+                val=hib_idle_text(hib["idleMin"]), warn=L("not loaded", "미등록")),
+        setting("⇄", L("Auto-swap", "한도스왑"),
                 state(lim["enabled"], lambda: not swap_target_exists(num, lim["minHeadroomPct"])),
-                val="교차허용" if lim["approveCrossing"] else "승인필요", warn="대상없음"),
+                val=L("any group", "교차허용") if lim["approveCrossing"] else L("same group", "승인필요"),
+                warn=L("no target", "대상없음")),
     ]
 
 
@@ -269,9 +271,9 @@ def main():
     badge = f"{kcolor}●{R} {BOLD}{kcolor}{label}{R} {kcolor}[{ktext}]{R}"
     if num is None:
         # 라이브 자격증명이 어느 슬롯에도 없다 — cswap 이 모르는 계정으로 돌고 있다.
-        badge += f" {DIM}(cswap 미등록){R}"
+        badge += f" {DIM}" + L("(not in cswap)", "(cswap 미등록)") + R
     elif ident["drift"]:
-        badge += f" \033[38;5;196m⚠드리프트{R}"
+        badge += " \033[38;5;196m⚠" + L("drift", "드리프트") + R
     parts = [badge]
 
     # CC 는 statusline 을 tty 없이 띄우지만 COLUMNS 를 넘겨준다 (get_terminal_size 가 그걸 읽는다).
@@ -322,7 +324,7 @@ def main():
             seg.append(window("Fable", fable, show_reset=False) + mark)
         if age is not None and age > STALE_MARK:
             seg[0] = f"{DIM}~{R}" + seg[0]
-            seg[-1] += f" {DIM}({age / 60:.0f}m전){R}"
+            seg[-1] += f" {DIM}(" + L(f"{age / 60:.0f}m ago", f"{age / 60:.0f}m전") + f"){R}"
     else:
         seg = [f"{DIM}5h — │ 1w — ({st.usage_note(num)}){R}"]
 
@@ -345,7 +347,7 @@ def main():
     if others:
         more = len(others) - OTHERS_SHOWN
         seg.append(f"{DIM}↔{R} " + f"{DIM},{R} ".join(others[:OTHERS_SHOWN])
-                   + (f" {DIM}외 {more}개{R}" if more > 0 else ""))
+                   + (f" {DIM}" + L(f"+{more} more", f"외 {more}개") + R if more > 0 else ""))
 
     lines += wrap(seg, PIPE, limit)
     lines += wrap(settings_parts(num), SEP, limit)

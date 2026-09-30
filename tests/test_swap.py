@@ -106,3 +106,11 @@ def test_handoff_copies_session_side_folder(home):
     dst = home.root / TEAM_PROFILE / "projects/-tmp-proj" / SID
     assert (dst / "tool-results/big.txt").read_text() == "large tool output"
     assert (dst / "subagents/agent-1.jsonl").exists()
+
+
+def test_english_messages(home):
+    r = home.run("swap", "request", "2", "--sid", SID, CC_SWAP_LOOP=1, CC_BATON_LANG="en")
+    assert r.returncode == 2 and "crosses groups" in r.stdout
+    home.set_config(onLimit={"enabled": True, "approveCrossing": True, "minHeadroomPct": 15})
+    home.set_usage("2", 100)
+    assert "No other account has room left" in limit_hook(home, CC_BATON_LANG="en")

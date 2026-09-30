@@ -21,6 +21,8 @@ PKG_JSON="$NPM_PREFIX/lib/node_modules/$PKG/package.json"
 BIN="$NPM_PREFIX/bin/claude"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/cc-baton"
 LOCK="$STATE/claude-update.lock"
+# 화면 문구: m "English" "한국어" (언어는 cc-baton 이 CC_BATON_LANG 으로 넘긴다)
+m() { if [[ "$CC_BATON_LANG" == ko ]]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
 R=$'\033[0m'; DIM=$'\033[2m'; BOLD=$'\033[1m'; GRN=$'\033[38;5;42m'; YEL=$'\033[38;5;208m'
 
 [[ -n "$CC_NO_UPDATE" ]] && exit 0
@@ -72,8 +74,8 @@ latest="$(curl -fsS --max-time 5 "https://registry.npmjs.org/$PKG/latest" 2>/dev
   | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" 2>/dev/null)"
 
 if [[ -z "$latest" ]]; then
-  echo "${DIM}[cc-update] 최신 버전 확인 실패(네트워크) — 설치된 ${installed:-?} 로 실행${R}" >&2
-  wait_for_bin || echo "${YEL}![cc-update] $BIN 이 없다 — 다른 탭이 설치 중일 수 있다${R}" >&2
+  echo "${DIM}[cc-baton] $(m "couldn't check the latest version (network); running the installed ${installed:-?}" "최신 버전 확인 실패(네트워크) — 설치된 ${installed:-?} 로 실행")${R}" >&2
+  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing; another tab may be installing" "$BIN 이 없다 — 다른 탭이 설치 중일 수 있다")${R}" >&2
   exit 0
 fi
 
@@ -87,13 +89,13 @@ up_to_date() {
 if up_to_date "$installed"; then
   rm -f "$FAILED"   # 이미 최신 — 예전 실패 표시는 낡은 것
   # 내가 설치할 일은 없다. 다만 다른 탭이 지금 reify 중일 수 있으니 bin 은 확인하고 넘긴다.
-  wait_for_bin || echo "${YEL}![cc-update] $BIN 이 없다 — 다른 탭이 설치 중일 수 있다${R}" >&2
+  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing; another tab may be installing" "$BIN 이 없다 — 다른 탭이 설치 중일 수 있다")${R}" >&2
   exit 0
 fi
 
 if ! acquire_lock; then
-  echo "${YEL}![cc-update] 다른 탭의 업데이트를 90초 기다렸다 — 설치된 ${installed:-?} 로 실행${R}" >&2
-  wait_for_bin || echo "${YEL}![cc-update] $BIN 이 없다${R}" >&2
+  echo "${YEL}![cc-baton] $(m "waited 90s for another tab's update; running the installed ${installed:-?}" "다른 탭의 업데이트를 90초 기다렸다 — 설치된 ${installed:-?} 로 실행")${R}" >&2
+  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing" "$BIN 이 없다")${R}" >&2
   exit 0
 fi
 
@@ -101,23 +103,23 @@ fi
 installed="$(installed_version)"
 if up_to_date "$installed"; then
   release_lock
-  wait_for_bin || echo "${YEL}![cc-update] $BIN 이 없다${R}" >&2
+  wait_for_bin || echo "${YEL}![cc-baton] $(m "$BIN is missing" "$BIN 이 없다")${R}" >&2
   exit 0
 fi
 
-echo "${YEL}⬆${R} Claude Code ${installed:-(없음)} → ${BOLD}$latest${R} 업데이트 중…" >&2
+echo "${YEL}⬆${R} Claude Code ${installed:-$(m "(none)" "(없음)")} → ${BOLD}$latest${R} $(m "updating…" "업데이트 중…")" >&2
 if npm install -g "$PKG@$latest" --no-fund --no-audit --loglevel=error >&2; then
-  echo "${GRN}✓${R} Claude Code $latest 설치 완료" >&2
+  echo "${GRN}✓${R} Claude Code $latest $(m "installed" "설치 완료")" >&2
   rm -f "$FAILED"
 else
   mkdir -p "$(dirname "$FAILED")" && touch "$FAILED"
-  echo "${YEL}![cc-update] 업데이트 실패 — 설치된 ${installed:-?} 로 실행한다. 수동: npm i -g $PKG@latest${R}" >&2
+  echo "${YEL}![cc-baton] $(m "update failed; running the installed ${installed:-?}. By hand: npm i -g $PKG@latest" "업데이트 실패 — 설치된 ${installed:-?} 로 실행한다. 수동: npm i -g $PKG@latest")${R}" >&2
 fi
 release_lock
 
 # 여기서 bin 이 없으면 cswap 이 exec 단계에서 파이썬 트레이스백으로 죽는다. 먼저 알려준다.
 if ! wait_for_bin; then
-  echo "${YEL}![cc-update] $BIN 이 40초째 없다 — cswap 실행이 실패할 수 있다." >&2
-  echo "   수동 복구: npm i -g $PKG@latest${R}" >&2
+  echo "${YEL}![cc-baton] $(m "$BIN has been missing for 40s; launching may fail." "$BIN 이 40초째 없다 — 실행이 실패할 수 있다.")" >&2
+  echo "   $(m "Fix by hand" "수동 복구"): npm i -g $PKG@latest${R}" >&2
 fi
 exit 0

@@ -1,17 +1,17 @@
 ---
-description: 컨텍스트를 유지한 채 다른 Claude 계정으로 전환한다 (claude-swap 세션 모드)
-argument-hint: [계정번호|별칭] [--yes]
+description: Switch this conversation to another Claude account with its full context (cc-baton)
+argument-hint: [account number|alias] [--yes]
 allowed-tools: Bash({cc_baton} swap:*)
 ---
 
-> 정상 경로에서는 `UserPromptSubmit` 훅(`cc-baton swap hook prompt`)이 `/swap` 을 **모델 호출 없이** 먼저 처리하고 프롬프트를 막는다 — 5h 한도에 걸린 세션에서도 동작하게 하기 위해서다. 이 지시가 모델(너)에게 도달했다면 훅이 실패한 것이니 아래 폴백대로 실행해라.
+> Normally the `UserPromptSubmit` hook (`cc-baton swap hook prompt`) handles `/swap` **before any model call** and blocks the prompt, so it works even in a session that has hit its 5h limit. If this instruction reached you, the hook failed; use the fallback below.
 
-`{cc_baton} swap request $ARGUMENTS` 를 실행하고 출력을 그대로 사용자에게 전달해라.
+Run `{cc_baton} swap request $ARGUMENTS` and show the user its output as is. Reply in the user's language.
 
-종료 코드별 처리:
-- **0** — 스왑 예약 완료. 사용자에게 `Ctrl+D` 를 눌러 재개하라고 알리고 **여기서 멈춰라**. 다른 작업을 시작하지 마라 (곧 프로세스가 종료된다).
-- **2** — team ↔ personal 경계 교차라 승인이 필요하다. 경고를 그대로 보여주고 사용자 판단을 기다려라. 사용자가 명시적으로 진행하겠다고 답한 경우에만 `--yes` 를 붙여 재실행해라. **네 판단으로 `--yes` 를 붙이지 마라.**
-- **3** — `cc` 래퍼 밖이라 자동 재기동이 불가능하다. 출력된 수동 명령 2줄을 그대로 안내해라.
-- **1** — 인자 오류. 인자 없이 `/swap` 을 실행하면 계정 목록이 나온다.
+By exit code:
+- **0** — Swap scheduled. Tell the user to press `Ctrl+D` to continue on the new account, then **stop**. Don't start any other work (the process is about to exit).
+- **2** — The target is in a different account group and needs approval. Show the warning as is and wait for the user. Re-run with `--yes` only if the user explicitly says to go ahead. **Never add `--yes` on your own.**
+- **3** — Not running inside `baton`, so it can't relaunch automatically. Relay the two manual commands it printed.
+- **1** — Bad argument. Running `/swap` with no argument lists the accounts.
 
-인자가 없으면 계정 목록만 출력된다. 그 경우 목록을 보여주고 어느 계정으로 갈지 물어라.
+With no argument it only lists accounts. In that case show the list and ask which account to switch to.

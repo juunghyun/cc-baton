@@ -55,10 +55,7 @@ baton() {
     if hsid="$("$b" hib claim)" && [[ -n "$hsid" ]]; then
       "$b" hib banner "$hsid"
       read -k 1 -s
-      if ! "$b" hib wake "$hsid"; then
-        echo "  이 세션은 다른 곳에서 이미 깨어났습니다."
-        return 0
-      fi
+      "$b" hib wake "$hsid" || return 0   # 다른 데서 이미 깨웠으면 안내만 찍고 끝
       args=(--resume "$hsid")
       continue
     fi

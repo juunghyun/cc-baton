@@ -23,6 +23,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 푸시 범위가 아니라 전체 이력을 본다. 범위 검사는 강제 푸시 뒤 없어진 이전 커밋을 찾다 실패한다.
+      - name: gitleaks (full history)
+        run: |
+          curl -sSfL -o gl.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz
+          echo "9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c  gl.tgz" | sha256sum -c -
+          tar -xzf gl.tgz gitleaks
+          ./gitleaks git --redact -v --exit-code 1 .

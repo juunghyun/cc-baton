@@ -8,6 +8,7 @@
   3. 계정 성격(TEAM/PERSONAL)을 눈에 띄게 박는다 — 팀 계정과 개인 계정을 헷갈리는 게 이 시스템의 유일한 치명적 사고.
 """
 import colorsys
+import getpass
 import json
 import os
 import re
@@ -113,7 +114,10 @@ def git_bit(cwd):
 # 브랜치 타입 접두사 축약: feature/<user>_proj-302_dashboard → ft/proj-302_dashboard
 BRANCH_PREFIX = {"feature": "ft", "fix": "fx", "hotfix": "hf", "chore": "ch",
                  "refactor": "rf", "release": "rel", "bugfix": "fx", "docs": "doc"}
-USER_TOKEN = re.compile(r"\b<user>[_-]", re.I)
+try:  # 브랜치명에 붙이는 본인 이름 = 대개 로그인 이름
+    USER_TOKEN = re.compile(rf"\b{re.escape(getpass.getuser())}[_-]", re.I)
+except Exception:
+    USER_TOKEN = re.compile(r"(?!)")  # 아무것도 안 지운다
 
 
 def short_branch(branch, cap=22):

@@ -214,7 +214,7 @@ def idle_threshold():
     free, swap = mem_pressure()
     if (free is not None and free < 25) or swap > 512:
         return IDLE_MIN_PRESSURE, f"메모리 압박(여유 {free}%, 스왑 {swap:.0f}MB)"
-    return float(st.feature("hibernate")["idleMin"]), None  # 유휴 임계(분), cc-accounts.json
+    return float(st.feature("hibernate")["idleMin"]), None  # 유휴 임계(분), config.json
 
 
 # ── 트랜스크립트 구조 분석 ────────────────────────────────────────────

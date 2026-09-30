@@ -7,6 +7,7 @@ cswap의 온디스크 포맷(sequence.json / mappings.json / cache/usage.json)�
 import json
 import os
 import re
+import shutil
 import time
 import unicodedata
 from datetime import datetime, timezone
@@ -172,13 +173,31 @@ def scoped(good, name):
     return None
 
 
-# --- 계정 성격(team/personal) : cswap이 모르는 정보라 우리가 따로 관리 ---
-KIND_PATH = Path.home() / ".claude" / "cc-accounts.json"
+# --- 설정 파일 : 계정 성격 + 기능 스위치. cswap 이 모르는 정보라 우리가 따로 관리 ---
+CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "cc-baton" / "config.json"
+LEGACY_CONFIG = Path.home() / ".claude" / "cc-accounts.json"  # 0.1 이전 위치
+
+
+def config_path():
+    """설정 파일 경로. 새 위치에 없고 예전 위치에 있으면 복사해 온다 (예전 파일은 남겨 둔다)."""
+    if not CONFIG_PATH.exists() and LEGACY_CONFIG.exists():
+        try:
+            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            tmp = CONFIG_PATH.with_suffix(".json.tmp")
+            shutil.copy2(LEGACY_CONFIG, tmp)
+            os.replace(tmp, CONFIG_PATH)  # statusline 이 동시에 읽어도 반쪽 파일을 보지 않게
+        except OSError:
+            return LEGACY_CONFIG
+    return CONFIG_PATH
+
+
+def config():
+    return _load(config_path(), {})
 
 
 def kind(num):
     """'team' | 'personal' | 'unknown'."""
-    entry = _load(KIND_PATH, {}).get(str(num))
+    entry = config().get(str(num))
     if isinstance(entry, dict):
         k = str(entry.get("kind", "")).lower()
         if k in ("team", "personal"):
@@ -199,13 +218,13 @@ FEATURE_DEFAULTS = {
     "onLimit": {"enabled": True, "approveCrossing": False, "minHeadroomPct": 15},
 }
 UPDATE_FAILED = STATE_DIR / "update-failed"  # cc-update 가 설치 실패 시 남긴다
-HIB_LABEL = "com.<user>.cc-hib"             # cc-hib tick 을 돌리는 launchd 에이전트
+HIB_LABEL = "io.github.juunghyun.cc-baton.hib"  # hib tick 을 돌리는 launchd 에이전트
 
 
 def feature(key):
     """빠진 키는 기본값, 모르는 키는 무시."""
     cfg = dict(FEATURE_DEFAULTS[key])
-    raw = _load(KIND_PATH, {}).get(key)
+    raw = config().get(key)
     if isinstance(raw, dict):
         cfg.update({k: v for k, v in raw.items() if k in cfg})
     return cfg

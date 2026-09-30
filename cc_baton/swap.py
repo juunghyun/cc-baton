@@ -17,7 +17,7 @@ cswap이 주는 선택지는 '히스토리 전부 공유(--share-history)' 아�
 
 훅 두 개가 있는 이유: /swap 이 슬래시커맨드(=모델에게 "스크립트 실행해라"는 프롬프트)로만 있으면,
 정작 5h 한도에 걸렸을 때 그 모델 호출이 429 로 죽어서 스왑 자체를 못 한다. 훅은 모델 앞에서 돈다.
-한도 훅의 정책(교차 승인·여유 기준)은 ~/.claude/cc-accounts.json 의 "onLimit" 이 원본이다.
+한도 훅의 정책(교차 승인·여유 기준)은 ~/.config/cc-baton/config.json 의 "onLimit" 이 원본이다.
 """
 import contextlib
 import io
@@ -42,7 +42,7 @@ MODEL_SCOPED_RE = re.compile(r"reached your .+? limit", re.I)
 
 
 def onlimit_cfg():
-    """cc-accounts.json 의 "onLimit". 기본값은 state.FEATURE_DEFAULTS (HUD 와 공유)."""
+    """config.json 의 "onLimit". 기본값은 state.FEATURE_DEFAULTS (HUD 와 공유)."""
     return st.feature("onLimit")
 
 

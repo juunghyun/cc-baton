@@ -49,11 +49,12 @@
 - 작성자 환경은 `uv tool install -e` 로 개발 설치해 레포 수정이 바로 반영되게 유지
 - 완료 기준: 1단계 테스트 통과, 작성자 환경에서 HUD·스왑·절전 동작
 
-### 3. 설정 통합 + 개인 흔적 제거 (S~M)
+### 3. 설정 통합 + 개인 흔적 제거 (S~M) — 완료
 
-- 설정 파일 하나로: `~/.config/cc-baton/config.json`. 기존 `~/.claude/cc-accounts.json` 자동 이관
-- 브랜치명 치환 규칙(`<user>_`) → 설정값
-- launchd 라벨·plist 경로 → 설치 시 생성
+- 설정 파일 하나로: `~/.config/cc-baton/config.json` (`XDG_CONFIG_HOME` 존중). 예전 `~/.claude/cc-accounts.json` 은 처음 읽을 때 복사해 오고 원본은 남긴다
+- 브랜치명에서 지우는 본인 이름: 고정값(`<user>_`) → 로그인 이름(`getpass.getuser()`). 설정 없이 누구에게나 맞는다
+- launchd 라벨: `com.<user>.cc-hib` → `io.github.juunghyun.cc-baton.hib`
+- 5단계로 넘김: 상태 폴더 이름(`~/.local/state/cc-swap`, `cc-hib`) 통일, hib 로그 경로(`~/.claude/cc-hib.log`). 열려 있는 탭의 옛 `cc` 함수가 marker 경로를 들고 있어서, 설치 명령으로 탭을 새로 여는 시점에 함께 옮긴다
 
 ### 4. 여러 계정 지원 (M)
 
@@ -76,6 +77,7 @@
 
 ### 7. 문서 + CI (S~M)
 
+- 화면 문구 영어화 (지금은 한국어). 한국어는 README.ko.md 로
 - README (영어) + README.ko.md: 핵심 가치, 설치, 화면 GIF, 요구사항(claude-swap, Python 3.12+, zsh, truecolor 터미널), 약관·팀 계정 주의, 호환 확인 버전
 - GitHub Actions: macOS 테스트, 비밀값 스캔
 

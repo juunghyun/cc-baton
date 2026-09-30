@@ -44,3 +44,14 @@ def test_hibernate_off_makes_tick_noop(home):
     home.run("toggle", "hib", "off")
     r = home.run("hib", "tick")
     assert (r.returncode, r.stdout, r.stderr) == (0, "", "")
+
+
+def test_legacy_config_is_copied_to_new_location(home):
+    legacy = home.root / ".claude/cc-accounts.json"
+    legacy.parent.mkdir(exist_ok=True)
+    legacy.write_text(home.config.read_text())
+    home.config.unlink()
+
+    assert home.run("toggle", "swap", "off").returncode == 0
+    assert json.loads(home.config.read_text())["onLimit"]["enabled"] is False
+    assert json.loads(legacy.read_text())["onLimit"]["enabled"] is True  # 예전 파일은 건드리지 않는다

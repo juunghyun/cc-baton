@@ -1,4 +1,5 @@
 import json
+import subprocess
 
 import pytest
 
@@ -66,3 +67,14 @@ def test_settings_row_off_and_warnings(home):
     assert row.count(SWITCH_WARN) == 3
     text = plain(row)
     assert "실패" in text and "미등록" in text and "대상없음" in text
+
+
+def test_branch_drops_login_name_and_shortens_type(home):
+    repo = home.root / "repo"
+    repo.mkdir()
+    git = ["git", "-C", str(repo), "-c", "user.email=t@example.com", "-c", "user.name=t"]
+    subprocess.run([*git, "init", "-q", "-b", "feature/tester_proj-1_login"], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "x"], check=True)
+    data = {"model": {"display_name": "Opus 5.5"}, "workspace": {"current_dir": str(repo)}}
+    r = home.run("statusline", input=json.dumps(data))
+    assert "(ft/proj-1_login)" in plain(r.stdout.split("\n")[0])

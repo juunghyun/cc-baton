@@ -24,7 +24,7 @@ One command, `cc-baton <subcommand>`:
 | `cc_baton/` | The package (`state.py` reads claude-swap's on-disk state) |
 | `commands/` | `/swap`, `/sleep` slash commands |
 | `shell/cc.zsh` | `cc` launcher loop (pick account, run, relaunch on swap/wake) |
-| `config/cc-accounts.example.json` | Account kinds and feature settings |
+| `config/config.example.json` | Account kinds and feature settings |
 
 Requires Python 3.12+ (claude-swap does). Dev install: `uv tool install -e .`
 

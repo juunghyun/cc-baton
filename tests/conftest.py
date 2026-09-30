@@ -41,7 +41,7 @@ class Home:
         self.backup = root / ".claude-swap-backup"
         self.fakebin = root / "fakebin"
         self.state = root / ".local/state/cc-swap"
-        self.config = root / ".claude/cc-accounts.json"
+        self.config = root / ".config/cc-baton/config.json"
 
     # --- 상태 조작 ---
     def write_json(self, rel, data):
@@ -79,6 +79,8 @@ class Home:
             # 스크립트 shebang 의 python3 가 테스트와 같은 인터프리터를 잡게 한다.
             "PATH": f"{self.fakebin}:{Path(sys.executable).parent}:/usr/bin:/bin",
             "LANG": "en_US.UTF-8",
+            "USER": "tester",
+            "LOGNAME": "tester",
             "COLUMNS": "140",
             "PYTHONPATH": str(ROOT),
         }
@@ -112,7 +114,7 @@ def home(tmp_path):
         "1": usage,
         "2": {**usage, "lastGood": {**usage["lastGood"], "five_hour": {"pct": 40, "resets_at": _iso(2)}}},
     }})
-    h.write_json(".claude/cc-accounts.json", {
+    h.write_json(".config/cc-baton/config.json", {
         "1": {"kind": "personal"},
         "2": {"kind": "team"},
         "autoUpdate": {"enabled": True},

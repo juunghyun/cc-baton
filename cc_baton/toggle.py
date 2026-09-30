@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""기능 스위치. 값의 원본은 ~/.claude/cc-accounts.json, HUD 3행이 이걸 보여준다.
+"""기능 스위치. 값의 원본은 ~/.config/cc-baton/config.json, HUD 3행이 이걸 보여준다.
 
   cc-baton toggle                        현황
   cc-baton toggle update|hib|swap on|off 켜기/끄기
@@ -21,8 +21,9 @@ KEYS = {"update": "autoUpdate", "hib": "hibernate", "swap": "onLimit"}
 
 def set_enabled(key, on):
     # 계정 성격 등 다른 설정과 같은 파일이다. 못 읽으면 덮어쓰지 않고 멈춘다.
-    path = st.KIND_PATH
+    path = st.config_path()
     cfg = json.loads(path.read_text()) if path.exists() else {}
+    path.parent.mkdir(parents=True, exist_ok=True)
     cfg.setdefault(key, {})["enabled"] = on
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")

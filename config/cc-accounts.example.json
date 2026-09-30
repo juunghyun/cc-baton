@@ -1,0 +1,26 @@
+{
+  "_comment": "계정 성격 라벨. cswap이 모르는 정보라 여기서 관리한다. kind: team | personal | unknown",
+  "1": {
+    "kind": "personal",
+    "note": "you@example.com — 개인 Max 20x"
+  },
+  "2": {
+    "kind": "team",
+    "note": "you@example.com — 팀 시트 Max 5x"
+  },
+  "autoUpdate": {
+    "_comment": "cc 실행·스왑 직전 Claude Code 최신화(cc-update). cc-toggle update on|off",
+    "enabled": true
+  },
+  "hibernate": {
+    "_comment": "유휴 세션 자동 재우기(cc-hib tick). idleMin=유휴 임계(분), 메모리 압박 시엔 30분. cc-toggle hib on|off",
+    "enabled": true,
+    "idleMin": 90
+  },
+  "onLimit": {
+    "_comment": "5h/주간 한도(StopFailure rate_limit 훅)에 걸리면 자동으로 스왑을 예약한다. approveCrossing: team↔personal 교차를 '한도 상황에 한해' 사전 승인. minHeadroomPct: 대상 계정의 5h 여유가 이보다 작으면 후보 제외. enabled=false 면 훅이 아무것도 안 한다.",
+    "enabled": true,
+    "approveCrossing": true,
+    "minHeadroomPct": 15
+  }
+}

@@ -154,7 +154,10 @@ def test_setup_wizard_in_terminal(home, inst):
     # 그룹: personal → side, team → 엔터(그대로) / 절전: 켜고 45분 / 자동 스왑: 끔
     for answer in (b"ko\r", b"side\r", b"\r", b"y\r", b"45\r", b"n\r"):
         pump(0.6)
-        os.write(fd, answer)
+        try:
+            os.write(fd, answer)
+        except OSError:  # 위저드가 먼저 끝났다 — 무엇을 찍고 끝났는지 보여준다
+            raise AssertionError(out.decode(errors="ignore"))
     pump(1.0)
     _, status = os.waitpid(pid, 0)
     assert os.waitstatus_to_exitcode(status) == 0, out.decode(errors="ignore")

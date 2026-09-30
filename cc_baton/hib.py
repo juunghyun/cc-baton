@@ -344,7 +344,11 @@ def verdict(row, now, idle_min_th):
 def cmd_scan(argv):
     th, why = idle_threshold()
     if "--idle" in argv:
-        th = float(argv[argv.index("--idle") + 1]); why = L("set by hand", "수동 지정")
+        try:
+            th = float(argv[argv.index("--idle") + 1]); why = L("set by hand", "수동 지정")
+        except (IndexError, ValueError):
+            print(L("usage: cc-baton hib scan [--idle <minutes>]", "사용법: cc-baton hib scan [--idle <분>]"), file=E)
+            return 1
     rows, lp, now = sessions()
     unreg = sorted(set(lp) - {r["pid"] for r in rows})
     print(BOLD + L(f"threshold {th:.0f}m", f"임계 {th:.0f}분") + R + (f" {YEL}({why}){R}" if why else ""))
@@ -387,7 +391,7 @@ def tty_note(row):
             t.write("\n  \033[38;5;170m💤 " + L("This session was hibernated to free memory", "이 세션은 메모리 회수를 위해 재워졌습니다")
                     + f"\033[0m  \033[2m({row['rss']}MB)\033[0m\n"
                     + "  \033[2m" + L("The conversation is intact. To come back:", "대화는 그대로입니다. 돌아가려면:")
-                    + "\033[0m cc-baton hib wake\n\n")
+                    + "\033[0m baton --wake\n\n")
     except OSError:
         pass                                    # 탭이 이미 닫혔으면 그만
 
@@ -575,8 +579,8 @@ def cmd_sleep(argv):
     if not cap_ok(row["tty"]) and not force:
         print(f"{YEL}!{R} {row['name']}: " + L("this tab isn't running baton, so it will drop to the shell prompt.",
                                                "이 탭은 대기 배너를 못 띄웁니다(셸 프롬프트로 떨어짐)."), file=E)
-        print(f"  {DIM}" + L("The conversation is safe; cc-baton hib wake brings it back. Use --force to go ahead",
-                             "대화는 안전하고 cc-baton hib wake 로 돌아옵니다. 그래도 재우려면 --force") + R, file=E)
+        print(f"  {DIM}" + L("The conversation is safe; baton --wake brings it back. Use --force to go ahead",
+                             "대화는 안전하고 baton --wake 로 돌아옵니다. 그래도 재우려면 --force") + R, file=E)
         return 1
     if dry:
         print(f"{DIM}[dry]{R} " + L(f"would hibernate {row['name']} ({row['pid']}, {row['rss']}MB)", f"{row['name']} ({row['pid']}, {row['rss']}MB) 를 재웁니다"))
@@ -585,7 +589,7 @@ def cmd_sleep(argv):
     selfk = (row["pid"] == me) or (row["pid"] in set(ancestors()))
     if selfk:
         print(f"{MAG}💤{R} " + L(f"Hibernating this session ({row['rss']}MB). ", f"이 세션을 재웁니다 — {row['rss']}MB. ")
-              + DIM + L("Press any key in this tab or run cc-baton hib wake to come back", "깨우려면 이 탭에서 키를 누르거나 cc-baton hib wake") + R)
+              + DIM + L("Press any key in this tab or run baton --wake to come back", "깨우려면 이 탭에서 키를 누르거나 baton --wake") + R)
     ok, msg = do_sleep(row, L("manual", "수동"), selfkill=selfk)
     if not selfk:
         print(f"{GRN}✓{R} " + L(f"{row['name']} hibernated: {msg}", f"{row['name']} 재움 — {msg}") if ok else f"{RED}✗{R} {msg}")

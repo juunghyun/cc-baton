@@ -24,12 +24,12 @@ The process is about to be killed, so:
 The refusal is one of two kinds:
 
 - **Blockers** — a scheduled wakeup, unfinished background work, or an artifact with an active comment thread. Hibernating would lose it. Tell the user what would be lost and let them decide.
-- **Tab not running baton** — that tab can't show the waiting banner and drops to the shell prompt. The conversation is safe and `cc-baton hib wake` brings it back. The tab gets a notice.
+- **Tab not running baton** — that tab can't show the waiting banner and drops to the shell prompt. The conversation is safe and `baton --wake` brings it back. The tab gets a notice.
 
 ## Coming back
 
 - In a tab showing the waiting banner: **any key**
-- Anywhere else: `cc-baton hib wake`
+- Anywhere else: `baton --wake`
 
 ## Other targets
 

@@ -115,8 +115,12 @@ class Settings:
 
     def __init__(self):
         self.path = SETTINGS.resolve() if SETTINGS.is_symlink() else SETTINGS
-        raw = self.path.read_text() if self.path.exists() else "{}"
-        self.data = json.loads(raw)  # 깨졌으면 여기서 예외 → 호출자가 멈춘다
+        raw = self.path.read_text() if self.path.exists() else ""
+        self.data = json.loads(raw) if raw.strip() else {}  # 깨졌으면 여기서 예외 → 호출자가 멈춘다
+        if not isinstance(self.data, dict) or not isinstance(self.data.get("hooks") or {}, dict):
+            raise json.JSONDecodeError("expected an object (and hooks as an object)", raw, 0)
+        if self.data.get("hooks") is None:
+            self.data.pop("hooks", None)
         self.orig = json.dumps(self.data, sort_keys=True)
 
     def save(self):
@@ -135,7 +139,8 @@ def merge_hooks(data, exe):
     """우리 훅을 한 번씩만. 남의 훅은 그대로 두고, 예전 경로의 우리 훅은 새 경로로 바꾼다."""
     hooks = data.setdefault("hooks", {})
     for event, group_extra, sub, hook_extra in our_hooks():
-        groups = [g for g in hooks.get(event, []) if isinstance(g, dict)]
+        cur = hooks.get(event) or []
+        groups = [g for g in (cur if isinstance(cur, list) else [cur]) if isinstance(g, dict)]
         for g in groups:
             g["hooks"] = [h for h in g.get("hooks", []) if not _ours(h.get("command"))]
         groups = [g for g in groups if g.get("hooks")]
@@ -194,8 +199,10 @@ def zsh_block(exe):
 def _strip_block(text):
     """우리 블록과 0.1 이전 수동 설치 줄을 뺀 zshrc."""
     lines, out, skip = text.split("\n"), [], False
+    stripped = [ln.strip() for ln in lines]
+    whole = ZSH_BEGIN in stripped and ZSH_END in stripped[stripped.index(ZSH_BEGIN):]
     for line in lines:
-        if line.strip() == ZSH_BEGIN:
+        if line.strip() == ZSH_BEGIN and whole:  # 끝 표시가 없으면 블록을 건드리지 않는다 (뒤의 사용자 줄을 지우지 않게)
             skip = True
             continue
         if skip:
@@ -207,11 +214,19 @@ def _strip_block(text):
     return "\n".join(out)
 
 
+def _backup_zshrc(text):
+    if text:
+        (ZSHRC.parent / f"{ZSHRC.name}.bak-cc-baton").write_text(text)
+
+
 def install_zshrc(exe):
     text = ZSHRC.read_text() if ZSHRC.exists() else ""
     new = _strip_block(text).rstrip("\n") + "\n\n" + zsh_block(exe)
     if new.lstrip("\n") == text or new == text:
         return L("unchanged", "그대로")
+    if ZSH_BEGIN in _strip_block(text):  # 끝 표시가 빠진 블록: 손대지 않고 알린다
+        return YEL + L(f"our block in {ZSHRC} has no end line ({ZSH_END}); fix it by hand", f"{ZSHRC} 의 cc-baton 블록에 끝 줄({ZSH_END})이 없어 손대지 않았습니다. 직접 고쳐 주세요") + R
+    _backup_zshrc(text)
     ZSHRC.write_text(new.lstrip("\n"))
     return L("added", "추가") if ZSH_BEGIN not in text else L("updated", "갱신")
 
@@ -297,10 +312,32 @@ def unregister_hib():
 
 
 # ── install ──────────────────────────────────────────────────────────────
+class BrokenConfig(Exception):
+    pass
+
+
+def check_config():
+    """설정 파일이 깨져 있으면 BrokenConfig. 이것 없이 st.config() 는 깨진 파일을 {} 로 읽는다."""
+    return _strict_config()
+
+
 def save_config(**top):
-    cfg = st.config()
+    """설정 최상위 키를 바꿔 쓴다. 파일이 깨져 있으면 {} 로 덮어쓰지 않고 멈춘다 (계정 그룹을 잃지 않게)."""
+    cfg = _strict_config()
     cfg.update(top)
     _write_json(st.config_path(), cfg)
+    return cfg
+
+
+def _strict_config():
+    path = st.config_path()
+    try:
+        cfg = json.loads(path.read_text()) if path.exists() else {}
+    except (OSError, ValueError) as e:
+        raise BrokenConfig(L(f"{path} isn't valid JSON, so it was left alone ({e}). Fix it and run again.",
+                             f"{path} 가 올바른 JSON 이 아니라 손대지 않았습니다 ({e}). 고친 뒤 다시 실행하세요.")) from e
+    if not isinstance(cfg, dict):
+        raise BrokenConfig(L(f"{path} isn't a JSON object, so it was left alone.", f"{path} 가 JSON 객체가 아니라 손대지 않았습니다."))
     return cfg
 
 
@@ -325,9 +362,8 @@ def cmd_install(argv):
         s.data["statusLine"] = our_statusline(exe)
         report.append(L("HUD (statusline): installed", "HUD(statusline): 설치"))
     elif _ours(cur.get("command") if isinstance(cur, dict) else cur):
-        s.data["statusLine"] = {**cur, **{"command": f"{shell_path(exe)} statusline"}}
+        s.data["statusLine"] = {**(cur if isinstance(cur, dict) else our_statusline(exe)), "command": f"{shell_path(exe)} statusline"}
     else:
-        inst.setdefault("prevStatusLine", cur)
         report.append(L("HUD (statusline): you already have one, left as is. The setup wizard on first `baton` can switch it",
                         "HUD(statusline): 기존 statusline 이 있어 그대로 둠 — `baton` 첫 실행 위저드에서 바꿀 수 있음"))
     backup = s.save()
@@ -493,7 +529,7 @@ def cmd_setup(argv):
             if t.yes("  " + L("Switch to the cc-baton HUD? (uninstall puts yours back)",
                               "cc-baton HUD 로 바꿀까요? (지울 때 원래 것으로 되돌립니다)")):
                 inst = _read_json(INSTALL_STATE, {})
-                inst.setdefault("prevStatusLine", cur)
+                inst["prevStatusLine"] = cur
                 _write_json(INSTALL_STATE, inst)
                 s.data["statusLine"] = our_statusline(exe)
                 s.save()
@@ -513,7 +549,9 @@ def cmd_setup(argv):
             m = t.ask("  " + L("After how many idle minutes?", "몇 분 쉬면 재울까요?") + f" [{hib['idleMin']:g}]: ",
                       str(hib["idleMin"]))
             try:
-                idle = max(5.0, float(m))
+                idle = min(1440.0, max(5.0, float(m)))  # 5분 ~ 하루
+                if idle != idle:  # nan
+                    raise ValueError
             except ValueError:
                 idle = float(hib["idleMin"])
             cfg = st.config()
@@ -592,13 +630,17 @@ def cmd_setup(argv):
 
 
 def _refresh_hook_messages(exe):
-    """훅의 statusMessage 는 설치 때 언어로 박힌다. 언어를 바꾸면 다시 맞춘다."""
+    """훅의 statusMessage 는 설치 때 언어로 박힌다. 언어를 바꾸면 다시 맞춘다. 설치돼 있지 않으면 아무것도 넣지 않는다."""
     try:
         s = Settings()
     except json.JSONDecodeError:
         return
-    merge_hooks(s.data, exe)
-    s.save()
+    present = [h for groups in (s.data.get("hooks") or {}).values() if isinstance(groups, list)
+               for g in groups if isinstance(g, dict) for h in g.get("hooks") or [] if isinstance(h, dict)
+               and _ours(h.get("command"))]
+    if present:
+        merge_hooks(s.data, exe)
+        s.save()
 
 
 # ── uninstall ────────────────────────────────────────────────────────────
@@ -638,7 +680,11 @@ def cmd_uninstall(argv):
     if ZSHRC.exists():
         text = ZSHRC.read_text()
         new = _strip_block(text)
-        if new != text:
+        if ZSH_BEGIN in new:
+            report.append(YEL + L(f"~/.zshrc: our block has no end line ({ZSH_END}), left alone; remove it by hand",
+                                  f"~/.zshrc: cc-baton 블록에 끝 줄({ZSH_END})이 없어 그대로 뒀습니다. 직접 지워 주세요") + R)
+        elif new != text:
+            _backup_zshrc(text)
             ZSHRC.write_text(new.rstrip("\n") + "\n")
             report.append(L("~/.zshrc block: removed (open shells change once reopened)",
                             "~/.zshrc 블록: 제거 (열려 있는 셸은 새로 열면 반영)"))
@@ -660,6 +706,7 @@ def cmd_uninstall(argv):
 
     if purge or ask(L("Also delete settings and state (account groups, state, hibernate log)?",
                       "설정·기록(계정 그룹, 상태, 절전 로그)까지 지울까요?"), False):
+        st.LEGACY_CONFIG.unlink(missing_ok=True)  # 남기면 다음 실행 때 새 위치로 다시 복사된다
         for p in (st.CONFIG_PATH.parent, st.STATE_DIR, *st.LEGACY_STATE):
             if p.is_symlink():
                 p.unlink()
@@ -672,7 +719,7 @@ def cmd_uninstall(argv):
     say(f"{GRN}✓{R} " + L("cc-baton wiring removed", "cc-baton 연결 제거"))
     for line in report:
         say(f"  {DIM}·{R} {line}")
-    if "--keep-package" not in argv and ask(L("Remove the cc-baton package too?", "cc-baton 패키지도 지울까요?"), True):
+    if "--keep-package" not in argv and (yes or (t is not None and t.yes(L("Remove the cc-baton package too?", "cc-baton 패키지도 지울까요?"), True))):
         rc = subprocess.run(["uv", "tool", "uninstall", "cc-baton"], capture_output=True).returncode
         say(f"  {DIM}·{R} " + (L("package: removed", "패키지: 삭제") if rc == 0
                                else L("package: removal failed, run uv tool uninstall cc-baton", "패키지: 삭제 실패 — uv tool uninstall cc-baton")))

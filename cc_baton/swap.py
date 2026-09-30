@@ -154,8 +154,12 @@ def cmd_request(argv, sid_override=None):
         st.MARKER.unlink(missing_ok=True)
         print(f"{YEL}!{R} " + L("Not running inside `baton`, so it can't relaunch for you. After exiting, run:\n",
                                 "`baton` 으로 연 세션이 아니라 자동으로 다시 열 수 없습니다. 종료 후 아래를 실행하세요:\n"))
-        print(f"  {BOLD}cc-baton swap handoff {target['num']} --sid {sid} --src-profile {src_profile} && \\")
-        print(f"  cc-baton cswap run {target['num']} -- --resume {sid}{R}")
+        if sid:
+            print(f"  {BOLD}cc-baton swap handoff {target['num']} --sid {sid} --src-profile {src_profile} && \\")
+            print(f"  cc-baton cswap run {target['num']} -- --resume {sid}{R}")
+        else:  # 세션 ID 를 모르면 대화를 옮길 수 없다. 새 대화로 연다
+            print(f"  {BOLD}cc-baton cswap run {target['num']}{R}  {DIM}"
+                  + L("(session id unknown, so this starts a new conversation)", "(세션 ID 를 몰라 새 대화로 엽니다)") + R)
         return 3
 
     print(f"{GRN}✓{R} " + L("Next account: ", "다음 계정: ") + f"{BOLD}{target['label']}{R} [{st.group(target['num'])}]"
@@ -360,6 +364,8 @@ def _hook_log(kind, data, rc):
 
 def cmd_hook(argv):
     kind = argv[0] if argv else ""
+    if kind not in ("prompt", "limit"):  # stdin 을 기다리기 전에 사용법부터
+        die(L("usage: cc-baton swap hook <prompt|limit>   (hook JSON on stdin)", "사용법: cc-baton swap hook <prompt|limit>   (stdin 으로 훅 JSON)"))
     try:
         data = json.load(sys.stdin)
     except Exception:

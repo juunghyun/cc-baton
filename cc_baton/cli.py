@@ -52,6 +52,11 @@ def cmd_lang(rest):
         print(L("usage: cc-baton lang en|ko", "사용법: cc-baton lang en|ko"), file=sys.stderr)
         return 1
     from . import i18n, install
+    try:
+        install.check_config()
+    except install.BrokenConfig as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 1
     install.save_config(language=rest[0])
     i18n.set_lang(rest[0])
     install._refresh_hook_messages(install.bin_path())  # 훅 안내 문구도 새 언어로
@@ -72,9 +77,21 @@ def main(argv=None):
         return subprocess.call(["/bin/bash", str(Path(__file__).with_name("claude_update.sh")), *rest], env=env)
     if sub == "cswap":
         from .state import CSWAP_BIN
-        os.execv(str(CSWAP_BIN), ["cswap", *rest])
+        try:
+            os.execv(str(CSWAP_BIN), ["cswap", *rest])
+        except OSError:
+            print(L(f"claude-swap isn't installed ({CSWAP_BIN}). Reinstall cc-baton: uv tool install --reinstall git+https://github.com/juunghyun/cc-baton",
+                    f"claude-swap 이 설치돼 있지 않습니다 ({CSWAP_BIN}). cc-baton 을 다시 설치하세요: uv tool install --reinstall git+https://github.com/juunghyun/cc-baton"),
+                  file=sys.stderr)
+            return 1
     if sub in INSTALL_CMDS:
         from . import install
+        if sub in ("install", "setup"):
+            try:
+                install.check_config()  # 깨진 설정을 {} 로 덮어쓰지 않게 시작 전에 멈춘다
+            except install.BrokenConfig as e:
+                print(f"✗ {e}", file=sys.stderr)
+                return 1
         return getattr(install, INSTALL_CMDS[sub])(rest) or 0
     if sub not in MODULES:
         print(usage(), file=sys.stderr)

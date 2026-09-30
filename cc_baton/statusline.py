@@ -34,6 +34,7 @@ STALE_MARK = 300.0      # 이보다 낡으면 화면에 낡았다고 표시한�
 
 
 def pct_color(pct):
+    pct = st.number(pct)
     if pct is None:
         return DIM
     if pct >= 90:
@@ -46,6 +47,7 @@ def pct_color(pct):
 
 
 def gauge(pct, width=6):
+    pct = st.number(pct)
     if pct is None:
         return DIM + "░" * width + R
     filled = max(0, min(width, round(pct / 100 * width)))
@@ -54,13 +56,14 @@ def gauge(pct, width=6):
 
 
 def pct_txt(pct):
+    pct = st.number(pct)
     return "—" if pct is None else f"{pct:.0f}%"
 
 
 def window(label, entry, show_reset=True):
-    if not entry or entry.get("pct") is None:
+    pct = st.number(entry.get("pct")) if isinstance(entry, dict) else None
+    if pct is None:
         return f"{DIM}{label} —{R}"
-    pct = entry.get("pct")
     out = f"{DIM}{label}{R} {gauge(pct)} {pct_color(pct)}{pct:.0f}%{R}"
     if show_reset:
         cd = st.countdown(entry.get("resets_at"))
@@ -268,7 +271,8 @@ def wrap(parts, sep, limit):
 
 def main():
     raw = sys.stdin.read()
-    data = json.loads(raw) if raw.strip() else {}
+    data = st._dict(json.loads(raw) if raw.strip() else {})
+    d = lambda k: st._dict(data.get(k))  # noqa: E731  Claude Code 입력 형식이 바뀌어도 빈 값으로
 
     ident = st.identity()
     num, label = ident["num"], ident["label"]
@@ -291,19 +295,19 @@ def main():
         width = 110
     limit = max(20, width - 4)
 
-    model = ((data.get("model") or {}).get("display_name") or "").strip()
+    model = str(d("model").get("display_name") or "").strip()
     model = model.replace(" (1M context)", "[1M]").replace(" (1m context)", "[1M]")
-    effort = ((data.get("effort") or {}).get("level") or "").strip()
+    effort = str(d("effort").get("level") or "").strip()
     if model:
         parts.append(model + (f" {effort_bit(effort)}" if effort else ""))
 
     # ctx 는 계정 다음으로 중요한데다 계속 변하는 값이라, 긴 경로/브랜치보다 앞에 둔다.
     # 뒤에 두면 워크트리 이름이 길 때 화면 밖으로 밀려난다(실제로 겪은 문제).
-    ctx = (data.get("context_window") or {}).get("used_percentage")
+    ctx = st.number(d("context_window").get("used_percentage"))
     if ctx is not None:
         parts.append(f"{DIM}ctx{R} {pct_color(ctx)}{ctx:.0f}%{R}")
 
-    cwd = (data.get("workspace") or {}).get("current_dir") or data.get("cwd") or ""
+    cwd = str(d("workspace").get("current_dir") or data.get("cwd") or "")
     if cwd:
         g = git_bit(cwd)
         # 마지막 줄에 남은 폭을 재서 경로/브랜치 예산을 정한다. 너무 좁으면 경로는 다음 줄로 넘긴다.
@@ -319,51 +323,62 @@ def main():
 
     lines = wrap(parts, SEP, limit)
 
-    # --- line 2: 이 계정의 잔량 + 다른 계정 요약 ---
-    good = st.usage(num)
-    age = good.get("_age") if good else None
-    maybe_refresh(age)
+    # 줄마다 따로 실패한다: 잔량·설정 줄이 깨져도 1행(지금 계정)은 남는다.
+    try:
+        # --- line 2: 이 계정의 잔량 + 다른 계정 요약 ---
+        good = st.usage(num)
+        age = good.get("_age") if good else None
+        maybe_refresh(age)
 
-    if good:
-        seg = [window("5h", good.get("five_hour")), window("1w", good.get("seven_day"))]
-        fable = st.scoped(good, "Fable")
-        if fable:
-            mark = "⚠" if (fable.get("pct") or 0) >= 100 else ""
-            seg.append(window("Fable", fable, show_reset=False) + mark)
-        if age is not None and age > STALE_MARK:
-            seg[0] = f"{DIM}~{R}" + seg[0]
-            seg[-1] += f" {DIM}(" + L(f"{age / 60:.0f}m ago", f"{age / 60:.0f}m전") + f"){R}"
-    else:
-        seg = [f"{DIM}5h — │ 1w — ({st.usage_note(num)}){R}"]
+        if good:
+            seg = [window("5h", good.get("five_hour")), window("1w", good.get("seven_day"))]
+            fable = st.scoped(good, "Fable")
+            if fable:
+                mark = "⚠" if (st.number(fable.get("pct")) or 0) >= 100 else ""
+                seg.append(window("Fable", fable, show_reset=False) + mark)
+            if age is not None and age > STALE_MARK:
+                seg[0] = f"{DIM}~{R}" + seg[0]
+                seg[-1] += f" {DIM}(" + L(f"{age / 60:.0f}m ago", f"{age / 60:.0f}m전") + f"){R}"
+        else:
+            seg = [f"{DIM}5h — │ 1w — ({st.usage_note(num)}){R}"]
 
-    # 다른 계정: 최근에 쓴 순서(기록 없는 계정은 등록 순서로 뒤에). 동시에 여러 계정을 써도 계정별 시각으로 줄 세운다.
-    others = []
-    for i, a in enumerate(st.accounts()):
-        if a["num"] == num:
-            continue
-        g2 = st.usage(a["num"])
-        if not g2:
-            continue
-        f5 = (g2.get("five_hour") or {}).get("pct")
-        f7 = (g2.get("seven_day") or {}).get("pct")
-        if f5 is None and f7 is None:
-            continue
-        used = st.last_used(a["num"])
-        text = f"{st.color(a['num'])}{a['label']}{R} {pct_color(f5)}{pct_txt(f5)}{R}/{pct_color(f7)}{pct_txt(f7)}{R}"
-        others.append(((used is None, -(used or 0), i), text))
-    others = [t for _, t in sorted(others)]
-    if others:
-        more = len(others) - OTHERS_SHOWN
-        seg.append(f"{DIM}↔{R} " + f"{DIM},{R} ".join(others[:OTHERS_SHOWN])
-                   + (f" {DIM}" + L(f"+{more} more", f"외 {more}개") + R if more > 0 else ""))
+        # 다른 계정: 최근에 쓴 순서(기록 없는 계정은 등록 순서로 뒤에). 동시에 여러 계정을 써도 계정별 시각으로 줄 세운다.
+        others = []
+        for i, a in enumerate(st.accounts()):
+            if a["num"] == num:
+                continue
+            g2 = st.usage(a["num"])
+            if not g2:
+                continue
+            f5 = st.number(st._dict(g2.get("five_hour")).get("pct"))
+            f7 = st.number(st._dict(g2.get("seven_day")).get("pct"))
+            if f5 is None and f7 is None:
+                continue
+            used = st.last_used(a["num"])
+            text = f"{st.color(a['num'])}{a['label']}{R} {pct_color(f5)}{pct_txt(f5)}{R}/{pct_color(f7)}{pct_txt(f7)}{R}"
+            others.append(((used is None, -(used or 0), i), text))
+        others = [t for _, t in sorted(others)]
+        if others:
+            more = len(others) - OTHERS_SHOWN
+            seg.append(f"{DIM}↔{R} " + f"{DIM},{R} ".join(others[:OTHERS_SHOWN])
+                       + (f" {DIM}" + L(f"+{more} more", f"외 {more}개") + R if more > 0 else ""))
 
-    lines += wrap(seg, PIPE, limit)
-    lines += wrap(settings_parts(num), SEP, limit)
+        lines += wrap(seg, PIPE, limit)
+    except Exception as exc:
+        lines.append(_broken(exc))
+    try:
+        lines += wrap(settings_parts(num), SEP, limit)
+    except Exception as exc:
+        lines.append(_broken(exc))
     print("\n".join(lines))
+
+
+def _broken(exc):
+    return f"\033[2m[statusline] {type(exc).__name__}: {str(exc)[:60]}\033[0m"
 
 
 def cli():
     try:
         main()
     except Exception as exc:  # statusline 은 무슨 일이 있어도 한 줄은 뱉는다
-        print(f"\033[2m[statusline] {type(exc).__name__}: {str(exc)[:60]}\033[0m")
+        print(_broken(exc))

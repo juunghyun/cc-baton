@@ -78,10 +78,11 @@ def test_uninstall_removes_only_ours_and_restores_statusline(home, inst):
                                               "hooks": {"UserPromptSubmit": [{"hooks": [FOREIGN_HOOK]}]}})
     home.zshrc.write_text("export FOO=1\n")
     inst("install")
-    # 위저드에서 HUD 로 바꾼 상태를 흉내: 원래 statusline 은 install-state 에 기록돼 있다
+    # 위저드에서 HUD 로 바꾼 상태를 흉내: 바꾸는 순간 원래 statusline 을 install-state 에 기록한다
     data = settings(home)
     data["statusLine"] = {"type": "command", "command": f"{EXE} statusline"}
     home.settings.write_text(json.dumps(data))
+    (home.config.parent / "install-state.json").write_text(json.dumps({"prevStatusLine": FOREIGN_STATUS}))
 
     inst("uninstall", "--yes", "--keep-package")
     data = settings(home)

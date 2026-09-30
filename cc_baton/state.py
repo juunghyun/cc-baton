@@ -29,7 +29,9 @@ _STATE_ROOT = Path(os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" /
 STATE_DIR = _STATE_ROOT / "cc-baton"
 # 0.1 이전 상태 폴더 → 새 위치. install 이 옮기고 옛 경로에 링크를 남긴다 (옛 셸 함수를 든 탭용).
 LEGACY_STATE = {_STATE_ROOT / "cc-swap": STATE_DIR, _STATE_ROOT / "cc-hib": STATE_DIR / "hib"}
-MARKER = STATE_DIR / "request.json"
+# /swap 예약은 탭마다 따로 (다른 탭의 claude 가 종료되며 가져가지 않게). baton 이 CC_BATON_TAB=$$ 를 넘긴다.
+_TAB = os.environ.get("CC_BATON_TAB", "")
+MARKER = STATE_DIR / (f"request-{_TAB}.json" if _TAB.isdigit() else "request.json")
 REFRESH_STAMP = STATE_DIR / "usage-refresh.stamp"
 
 
@@ -78,10 +80,21 @@ def write_json(path, data):
 
 
 def _load(path, default):
+    """JSON 을 읽되 모양(dict/list)이 기본값과 다르면 기본값. 남의 파일 형식이 바뀌어도 화면이 죽지 않게."""
     try:
-        return json.loads(Path(path).read_text())
+        v = json.loads(Path(path).read_text())
     except Exception:
         return default
+    return v if isinstance(v, type(default)) else default
+
+
+def _dict(v):
+    return v if isinstance(v, dict) else {}
+
+
+def number(v):
+    """숫자면 float, 아니면 None ("21" 같은 문자열·bool 은 숫자로 보지 않는다)."""
+    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v == v else None
 
 
 def sequence():
@@ -91,19 +104,21 @@ def sequence():
 def accounts():
     """슬롯 순서대로 [{num, email, alias, label}]."""
     seq = sequence()
-    table = seq.get("accounts", {}) or {}
-    order = seq.get("sequence") or sorted((int(k) for k in table), key=int)
+    table = _dict(seq.get("accounts"))
+    order = seq.get("sequence") if isinstance(seq.get("sequence"), list) else None
+    order = order or sorted((k for k in table if str(k).isdigit()), key=int)
     out = []
     for n in order:
         a = table.get(str(n))
-        if not a:
+        if not isinstance(a, dict):
             continue
-        alias = a.get("alias") or ""
+        alias = a.get("alias") if isinstance(a.get("alias"), str) else ""
+        email = a.get("email") if isinstance(a.get("email"), str) else ""
         out.append({
             "num": str(n),
-            "email": a.get("email", ""),
+            "email": email,
             "alias": alias,
-            "label": clean(alias or a.get("email", "")),
+            "label": clean(alias or email),
         })
     return out
 
@@ -177,18 +192,17 @@ def current_num():
 
 def usage(num):
     """마지막 성공 측정치 + 나이(초). 측정 이력이 없으면 None."""
-    entry = (_load(USAGE_PATH, {}).get("accounts", {}) or {}).get(str(num))
-    if not entry or not entry.get("lastGood"):
+    entry = _dict(_dict(_load(USAGE_PATH, {}).get("accounts")).get(str(num)))
+    if not isinstance(entry.get("lastGood"), dict) or not entry["lastGood"]:
         return None
     good = dict(entry["lastGood"])
-    good["_age"] = time.time() - (entry.get("fetchedAt") or 0)
+    good["_age"] = time.time() - (number(entry.get("fetchedAt")) or 0)
     good["_error"] = entry.get("lastError")
     return good
 
 
 def usage_error(num):
-    entry = (_load(USAGE_PATH, {}).get("accounts", {}) or {}).get(str(num)) or {}
-    return entry.get("lastError")
+    return _dict(_dict(_load(USAGE_PATH, {}).get("accounts")).get(str(num))).get("lastError")
 
 
 def mapped_num(cwd=None):
@@ -235,8 +249,9 @@ def countdown(resets_at):
 
 def scoped(good, name):
     """per-model 창(예: Fable) 찾기."""
-    for s in (good or {}).get("scoped", []) or []:
-        if str(s.get("name", "")).lower() == name.lower():
+    sc = (good or {}).get("scoped")
+    for s in sc if isinstance(sc, list) else []:
+        if isinstance(s, dict) and str(s.get("name", "")).lower() == name.lower():
             return s
     return None
 
@@ -350,8 +365,9 @@ def feature(key):
     """빠진 키는 기본값, 모르는 키는 무시."""
     cfg = dict(FEATURE_DEFAULTS[key])
     raw = config().get(key)
-    if isinstance(raw, dict):
-        cfg.update({k: v for k, v in raw.items() if k in cfg})
+    if isinstance(raw, dict):  # 기본값과 같은 종류의 값만 받는다 ("90" 같은 문자열 숫자는 버린다)
+        cfg.update({k: v for k, v in raw.items() if k in cfg and (
+            isinstance(v, bool) if isinstance(cfg[k], bool) else number(v) is not None if isinstance(cfg[k], (int, float)) else True)})
     return cfg
 
 
@@ -395,7 +411,8 @@ def live_email():
     화면에 계정을 표시할 때는 기록이 아니라 이 실제 값을 믿어야 한다.
     """
     cfg = _load(Path.home() / ".claude.json", {})
-    return ((cfg.get("oauthAccount") or {}).get("emailAddress") or "").strip()
+    email = _dict(cfg.get("oauthAccount")).get("emailAddress")
+    return email.strip() if isinstance(email, str) else ""
 
 
 def live_num():

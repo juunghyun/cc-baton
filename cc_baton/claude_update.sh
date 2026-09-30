@@ -28,6 +28,9 @@ R=$'\033[0m'; DIM=$'\033[2m'; BOLD=$'\033[1m'; GRN=$'\033[38;5;42m'; YEL=$'\033[
 [[ -n "$CC_NO_UPDATE" ]] && exit 0
 "${CC_BATON_PY:-python3}" -m cc_baton toggle is-on update || exit 0   # cc-baton toggle update off
 FAILED="$STATE/update-failed"   # HUD 3행이 ⚠실패 로 띄운다
+# npm 으로 깐 claude 가 아니면 할 일이 없다 (공식 설치본은 스스로 업데이트). 여기서 안 멈추면 bin 을 40초 기다린다.
+command -v npm >/dev/null && command -v node >/dev/null && [[ -n "$NPM_PREFIX" ]] || exit 0
+[[ -e "$BIN" || -d "$LOCK" ]] || exit 0
 
 installed_version() {
   [[ -f "$PKG_JSON" ]] || return 0

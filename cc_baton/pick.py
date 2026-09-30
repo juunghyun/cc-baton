@@ -66,7 +66,7 @@ def clip(s, width):
 
 def cols(fd):
     try:
-        return os.get_terminal_size(fd).columns
+        return os.get_terminal_size(fd).columns or 80  # 폭 0 을 알려 주는 pty 도 있다
     except OSError:
         return 80
 
@@ -113,8 +113,8 @@ def row(a, selected, is_default):
         note = f"{DIM}{cd}{R}" + (f"{DIM} ~{age / 60:.0f}m{R}" if age and age > STALE else "")
     cursor = f"{BOLD}❯{R}" if selected else " "
     mark = f"{DIM}·{R}" if is_default and not selected else " "
-    name = f"{REV}{kc}{a['label']:<12}{R}" if selected else f"{kc}{a['label']:<12}{R}"
-    return (f" {cursor}{mark}{a['num']}) {name} {kc}{short(st.group(a['num']), 9):<9}{R}"
+    name = f"{REV}{kc}{pad(a['label'], 12)}{R}" if selected else f"{kc}{pad(a['label'], 12)}{R}"
+    return (f" {cursor}{mark}{a['num']}) {name} {kc}{pad(short(st.group(a['num']), 9), 9)}{R}"
             f"{cell(g.get('five_hour'))} {cell(g.get('seven_day'))} {cell(fable, 6)}  {note}")
 
 
@@ -165,11 +165,14 @@ def interactive_select(accs, default_idx, tty_fd):
     draw()
     print(HIDE, end="", file=E, flush=True)
 
+    typed = ""  # 지금까지 누른 숫자 (10번 이상 계정용)
     old = termios.tcgetattr(tty_fd)
     try:
         ttymod.setraw(tty_fd)
         while True:
             k = read_key(tty_fd)
+            if not (isinstance(k, bytes) and k.isdigit()):
+                typed = ""
             if k in ("up", b"k", b"K"):
                 idx = (idx - 1) % n
             elif k in ("down", b"j", b"J", b"\t"):
@@ -179,9 +182,14 @@ def interactive_select(accs, default_idx, tty_fd):
             elif k in ("esc", b"q", b"Q", b"\x03", b"\x04"):
                 return None
             elif isinstance(k, bytes) and k.isdigit():
-                hit = next((i for i, a in enumerate(accs) if a["num"] == k.decode()), None)
-                if hit is not None:
+                # 숫자는 이어 붙여 본다: 다른 번호가 그걸로 시작하지 않으면(1 뒤에 10 이 없으면) 바로 고른다
+                typed = (typed + k.decode()) if any(a["num"].startswith(typed + k.decode()) for a in accs) else k.decode()
+                hit = next((i for i, a in enumerate(accs) if a["num"] == typed), None)
+                if hit is not None and not any(a["num"] != typed and a["num"].startswith(typed) for a in accs):
                     return hit
+                if hit is not None:
+                    idx = hit
+                draw()
                 continue
             else:
                 continue

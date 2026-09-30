@@ -29,6 +29,8 @@ def test_update_off_skips_network(home):
     (prefix / "bin").mkdir(parents=True)
     (prefix / "bin/claude").write_text("#!/bin/sh\n")
     (prefix / "bin/claude").chmod(0o755)  # 없으면 cc-update 가 설치 중인 줄 알고 40초 기다린다
+    home.fake("npm", "exit 1")
+    home.fake("node", "exit 1")
 
     home.run("toggle", "update", "off")
     r = home.run("claude-update", NPM_PREFIX=prefix)

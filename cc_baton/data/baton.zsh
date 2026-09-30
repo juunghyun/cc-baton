@@ -8,7 +8,7 @@
 # 세션 안에서 /swap 을 쓰면 마커가 남고, claude 종료 시 이 루프가 대화를 이관해 재개한다.
 baton() {
   local b="${CC_BATON_BIN:-cc-baton}"
-  local marker="${XDG_STATE_HOME:-$HOME/.local/state}/cc-baton/request.json"
+  local marker="${XDG_STATE_HOME:-$HOME/.local/state}/cc-baton/request-$$.json"   # 이 탭 전용 /swap 예약
   local target="" sid="" out rc hsid rest wcwd
   local -a args=() bypass=()
 
@@ -44,9 +44,9 @@ baton() {
     "$b" hib cap $$ 2>/dev/null
     "$b" claude-update
     if (( ${#args} + ${#bypass} )); then
-      CC_SWAP_LOOP=1 env -u CLAUDE_CONFIG_DIR "$b" cswap run "$target" -- "${bypass[@]}" "${args[@]}"
+      CC_SWAP_LOOP=1 CC_BATON_TAB=$$ env -u CLAUDE_CONFIG_DIR "$b" cswap run "$target" -- "${bypass[@]}" "${args[@]}"
     else
-      CC_SWAP_LOOP=1 env -u CLAUDE_CONFIG_DIR "$b" cswap run "$target"
+      CC_SWAP_LOOP=1 CC_BATON_TAB=$$ env -u CLAUDE_CONFIG_DIR "$b" cswap run "$target"
     fi
     rc=$?
 
@@ -62,7 +62,7 @@ baton() {
 
     [[ -f "$marker" ]] || return $rc
 
-    out="$("$b" swap consume)" || return $rc
+    out="$(CC_BATON_TAB=$$ "$b" swap consume)" || return $rc
     target="${out%%$'\t'*}"
     sid="${out#*$'\t'}"
     if [[ -n "$sid" ]]; then args=(--resume "$sid"); else args=(); fi

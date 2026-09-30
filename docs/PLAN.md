@@ -29,7 +29,11 @@
 
 ### 0. 결정 — 완료
 
-### 1. 동작 고정 테스트 (S)
+### 1. 동작 고정 테스트 (S) — 완료
+
+`tests/` 30개. 가짜 HOME 에 claude-swap 상태를 만들고 스크립트를 실제 프로세스로 돌린다 (피커는 pty).
+실행: `uv run --no-project --with pytest python -m pytest tests -q`
+
 
 구조를 바꾸기 전에 지금 동작을 테스트로 고정한다.
 

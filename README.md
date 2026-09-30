@@ -21,6 +21,14 @@ macOS only. Built on [claude-swap](https://github.com/realiti4/claude-swap) (MIT
 | `shell/cc.zsh` | `cc` launcher loop (pick account, run, relaunch on swap/wake) |
 | `config/cc-accounts.example.json` | Account kinds and feature settings |
 
+## Tests
+
+```sh
+uv run --no-project --with pytest python -m pytest tests -q
+```
+
+Each test builds a fake `$HOME` with claude-swap state and runs the scripts as real processes, so your own setup is never touched.
+
 ## License
 
 MIT

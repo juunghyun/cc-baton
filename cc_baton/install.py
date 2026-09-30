@@ -61,6 +61,13 @@ def bin_path():
     return str(venv_bin) if venv_bin.exists() else (on_path or "cc-baton")
 
 
+def shell_path(exe):
+    """훅·statusline 명령에 쓸 경로. 홈 아래면 $HOME/… (Claude Code 가 셸로 실행하므로 풀린다).
+    settings.json 이 사용자 이름과 무관해지고, 화면에 찍히는 훅 경로에도 계정 이름이 안 나온다."""
+    home = str(Path.home())
+    return "$HOME" + exe[len(home):] if exe.startswith(home + "/") else exe
+
+
 def _ours(cmd):
     return "cc-baton" in str(cmd) or "/.claude/bin/cc-swap" in str(cmd)  # 뒤는 0.1 이전 수동 설치
 
@@ -109,7 +116,7 @@ def merge_hooks(data, exe):
         for g in groups:
             g["hooks"] = [h for h in g.get("hooks", []) if not _ours(h.get("command"))]
         groups = [g for g in groups if g.get("hooks")]
-        groups.append({**group_extra, "hooks": [{"type": "command", "command": f"{exe} {sub}", **hook_extra}]})
+        groups.append({**group_extra, "hooks": [{"type": "command", "command": f"{shell_path(exe)} {sub}", **hook_extra}]})
         hooks[event] = groups
 
 
@@ -131,7 +138,7 @@ def remove_hooks(data):
 
 
 def our_statusline(exe):
-    return {"type": "command", "command": f"{exe} statusline", "refreshInterval": 10}
+    return {"type": "command", "command": f"{shell_path(exe)} statusline", "refreshInterval": 10}
 
 
 def install_commands(exe):
@@ -293,7 +300,7 @@ def cmd_install(argv):
         s.data["statusLine"] = our_statusline(exe)
         report.append(L("HUD (statusline): installed", "HUD(statusline): 설치"))
     elif _ours(cur.get("command") if isinstance(cur, dict) else cur):
-        s.data["statusLine"] = {**cur, **{"command": f"{exe} statusline"}}
+        s.data["statusLine"] = {**cur, **{"command": f"{shell_path(exe)} statusline"}}
     else:
         inst.setdefault("prevStatusLine", cur)
         report.append(L("HUD (statusline): you already have one, left as is. The setup wizard on first `baton` can switch it",

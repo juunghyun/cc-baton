@@ -185,3 +185,12 @@ def test_lang_command_switches_config_and_hook_messages(home, inst):
     msgs = [h.get("statusMessage") for g in settings(home)["hooks"]["UserPromptSubmit"] for h in g["hooks"]]
     assert "/swap 확인 중" in msgs
     assert home.run("lang", CC_BATON_LANG="").stdout.strip() == "ko"
+
+
+def test_paths_under_home_are_written_with_dollar_home(home, inst):
+    exe = str(home.root / ".local/bin/cc-baton")
+    assert home.run("install", CC_BATON_BIN=exe).returncode == 0
+    data = settings(home)
+    assert data["statusLine"]["command"] == "$HOME/.local/bin/cc-baton statusline"
+    assert "$HOME/.local/bin/cc-baton swap hook prompt" in our_commands(data)
+    assert str(home.root) not in json.dumps(data)  # settings.json 에 사용자 경로가 안 남는다

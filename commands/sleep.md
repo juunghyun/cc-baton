@@ -1,10 +1,10 @@
 ---
-description: 이 세션을 지금 재운다 — 대화는 그대로 두고 메모리만 회수한다 (cc-hib)
+description: 이 세션을 지금 재운다 — 대화는 그대로 두고 메모리만 회수한다 (cc-baton hib)
 argument-hint: [pid|이름] [--all] [--force] [--dry]
-allowed-tools: Bash(~/.claude/bin/cc-hib:*)
+allowed-tools: Bash(cc-baton hib:*)
 ---
 
-`~/.claude/bin/cc-hib sleep $ARGUMENTS` 를 실행하고 출력을 그대로 사용자에게 전달해라.
+`cc-baton hib sleep $ARGUMENTS` 를 실행하고 출력을 그대로 사용자에게 전달해라.
 
 인자가 없으면 **지금 이 세션**이 대상이다. 유예도 알림도 없이 즉시 종료된다 — 사용자가 명시적으로 시킨 것이기 때문이다.
 
@@ -24,12 +24,12 @@ allowed-tools: Bash(~/.claude/bin/cc-hib:*)
 거부 사유는 둘 중 하나다.
 
 - **차단신호** — 예약된 깨우기, 안 끝난 백그라운드 작업, 코멘트가 오가는 아티팩트. 재우면 잃는다. 무엇을 잃는지 사용자에게 알리고 판단을 받아라.
-- **래퍼 미지원** — 그 탭은 대기 배너를 못 띄워서 셸 프롬프트로 떨어진다. 대화는 안전하고 `cc-hib wake` 로 돌아온다. 탭에는 안내가 찍힌다.
+- **래퍼 미지원** — 그 탭은 대기 배너를 못 띄워서 셸 프롬프트로 떨어진다. 대화는 안전하고 `cc-baton hib wake` 로 돌아온다. 탭에는 안내가 찍힌다.
 
 ## 돌아오는 법
 
 - 대기 배너가 뜬 탭이면 **아무 키**
-- 그 외에는 어느 터미널에서든 `cc-hib wake`
+- 그 외에는 어느 터미널에서든 `cc-baton hib wake`
 
 ## 다른 대상 지정
 
@@ -38,4 +38,4 @@ allowed-tools: Bash(~/.claude/bin/cc-hib:*)
 - `/sleep --all` — 지금 조건에 맞는 유휴 세션 전부. `--all 60` 처럼 임계(분)를 붙일 수 있다
 - `/sleep --dry` — 무엇을 재울지만 보여주고 실행하지 않는다
 
-대상이 모호하거나 못 찾으면 `cc-hib scan` 결과를 보여주고 사용자에게 물어라.
+대상이 모호하거나 못 찾으면 `cc-baton hib scan` 결과를 보여주고 사용자에게 물어라.

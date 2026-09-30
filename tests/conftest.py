@@ -1,4 +1,4 @@
-"""가짜 HOME 에 claude-swap 상태를 만들어 두고 bin/ 스크립트를 실제 프로세스로 돌린다.
+"""가짜 HOME 에 claude-swap 상태를 만들어 두고 `python -m cc_baton <하위명령>` 을 실제 프로세스로 돌린다.
 
 스크립트는 전부 Path.home() 기준으로 상태를 읽으므로 HOME 만 바꾸면 실사용 환경과 격리된다.
 launchctl·curl 은 PATH 앞의 가짜 명령으로 대체한다.
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-BIN = Path(__file__).resolve().parent.parent / "bin"
+ROOT = Path(__file__).resolve().parent.parent
 ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07")
 
 PERSONAL = {"num": "1", "email": "personal@example.com", "alias": "personal"}
@@ -80,20 +80,14 @@ class Home:
             "PATH": f"{self.fakebin}:{Path(sys.executable).parent}:/usr/bin:/bin",
             "LANG": "en_US.UTF-8",
             "COLUMNS": "140",
+            "PYTHONPATH": str(ROOT),
         }
         e.update({k: str(v) for k, v in extra.items()})
         return e
 
-    def run(self, script, *args, input=None, **env):
-        path = BIN / script
-        cmd = [sys.executable, str(path), *args] if script.endswith(".py") or _is_python(path) \
-            else ["/bin/bash", str(path), *args]
-        return subprocess.run(cmd, input=input, capture_output=True, text=True,
-                              env=self.env(**env), cwd=self.root, timeout=20)
-
-
-def _is_python(path):
-    return path.read_text().startswith("#!/usr/bin/env python3")
+    def run(self, sub, *args, input=None, **env):
+        return subprocess.run([sys.executable, "-m", "cc_baton", sub, *args], input=input,
+                              capture_output=True, text=True, env=self.env(**env), cwd=self.root, timeout=20)
 
 
 @pytest.fixture

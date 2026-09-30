@@ -1,12 +1,12 @@
 ---
 description: 컨텍스트를 유지한 채 다른 Claude 계정으로 전환한다 (claude-swap 세션 모드)
 argument-hint: [계정번호|별칭] [--yes]
-allowed-tools: Bash(~/.claude/bin/cc-swap:*)
+allowed-tools: Bash(cc-baton swap:*)
 ---
 
-> 정상 경로에서는 `UserPromptSubmit` 훅(`cc-swap hook prompt`)이 `/swap` 을 **모델 호출 없이** 먼저 처리하고 프롬프트를 막는다 — 5h 한도에 걸린 세션에서도 동작하게 하기 위해서다. 이 지시가 모델(너)에게 도달했다면 훅이 실패한 것이니 아래 폴백대로 실행해라.
+> 정상 경로에서는 `UserPromptSubmit` 훅(`cc-baton swap hook prompt`)이 `/swap` 을 **모델 호출 없이** 먼저 처리하고 프롬프트를 막는다 — 5h 한도에 걸린 세션에서도 동작하게 하기 위해서다. 이 지시가 모델(너)에게 도달했다면 훅이 실패한 것이니 아래 폴백대로 실행해라.
 
-`~/.claude/bin/cc-swap request $ARGUMENTS` 를 실행하고 출력을 그대로 사용자에게 전달해라.
+`cc-baton swap request $ARGUMENTS` 를 실행하고 출력을 그대로 사용자에게 전달해라.
 
 종료 코드별 처리:
 - **0** — 스왑 예약 완료. 사용자에게 `Ctrl+D` 를 눌러 재개하라고 알리고 **여기서 멈춰라**. 다른 작업을 시작하지 마라 (곧 프로세스가 종료된다).

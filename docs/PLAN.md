@@ -32,7 +32,7 @@
 ### 1. 동작 고정 테스트 (S) — 완료
 
 `tests/` 30개. 가짜 HOME 에 claude-swap 상태를 만들고 스크립트를 실제 프로세스로 돌린다 (피커는 pty).
-실행: `uv run --no-project --with pytest python -m pytest tests -q`
+실행: `uv run --group dev python -m pytest tests -q`
 
 
 구조를 바꾸기 전에 지금 동작을 테스트로 고정한다.
@@ -42,7 +42,7 @@
 - 피커: pty 폭 테스트
 - toggle: 켜기/끄기, 설정 파일을 못 읽을 때 덮어쓰지 않음
 
-### 2. 패키지 구조로 재편 (M)
+### 2. 패키지 구조로 재편 (M) — 완료
 
 - `pyproject.toml` + `cc_baton/` 모듈, `cc-baton` 진입점 하나
 - claude-swap 의존성 + 버전 범위 고정
@@ -76,7 +76,7 @@
 
 ### 7. 문서 + CI (S~M)
 
-- README (영어) + README.ko.md: 핵심 가치, 설치, 화면 GIF, 요구사항(claude-swap, Python 3.10+, zsh, truecolor 터미널), 약관·팀 계정 주의, 호환 확인 버전
+- README (영어) + README.ko.md: 핵심 가치, 설치, 화면 GIF, 요구사항(claude-swap, Python 3.12+, zsh, truecolor 터미널), 약관·팀 계정 주의, 호환 확인 버전
 - GitHub Actions: macOS 테스트, 비밀값 스캔
 
 ### 8. 공개 (S)

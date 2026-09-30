@@ -34,8 +34,7 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import cswap_state as st  # noqa: E402
+from . import state as st
 
 # launchd 로그로 갈 땐 색을 빼야 읽힌다.
 if sys.stdout.isatty() or sys.stderr.isatty():
@@ -373,7 +372,7 @@ def tty_note(row):
         with open(f"/dev/{row['tty']}", "w") as t:
             t.write(f"\n  \033[38;5;170m💤 이 세션은 메모리 회수를 위해 재워졌습니다\033[0m"
                     f"  \033[2m({row['rss']}MB)\033[0m\n"
-                    f"  \033[2m대화는 그대로입니다. 돌아가려면:\033[0m cc-hib wake\n\n")
+                    f"  \033[2m대화는 그대로입니다. 돌아가려면:\033[0m cc-baton hib wake\n\n")
     except OSError:
         pass                                    # 탭이 이미 닫혔으면 그만
 
@@ -413,7 +412,7 @@ def do_sleep(row, reason, selfkill=False):
 
 def cmd_tick(argv):
     if not st.feature("hibernate")["enabled"]:
-        return 0  # cc-toggle hib off — 자동 재우기만 멈춘다 (/sleep 수동 재우기는 그대로)
+        return 0  # cc-baton toggle hib off — 자동 재우기만 멈춘다 (/sleep 수동 재우기는 그대로)
     th, why = idle_threshold()
     rows, lp, now = sessions()
     by_tty = {r["tty"]: r for r in rows}
@@ -544,7 +543,7 @@ def cmd_sleep(argv):
         if token == "self":
             print(f"{RED}✗{R} 지금 들어있는 세션을 못 찾았습니다. pid 나 이름을 주세요.", file=E)
         else:
-            print(f"{RED}✗{R} '{token}' 에 맞는 세션이 없습니다. cc-hib scan 으로 확인하세요.", file=E)
+            print(f"{RED}✗{R} '{token}' 에 맞는 세션이 없습니다. cc-baton hib scan 으로 확인하세요.", file=E)
         return 1
 
     b = blockers(tail_records(row["transcript"]), now) if row["transcript"] else ["트랜스크립트 없음"]
@@ -555,7 +554,7 @@ def cmd_sleep(argv):
         print(f"{YEL}!{R} 차단신호 무시하고 진행: {', '.join(b)}", file=E)
     if not cap_ok(row["tty"]) and not force:
         print(f"{YEL}!{R} {row['name']}: 이 탭은 대기 배너를 못 띄웁니다(셸 프롬프트로 떨어짐).", file=E)
-        print(f"  {DIM}대화는 안전하고 cc-hib wake 로 돌아옵니다. 그래도 재우려면 --force{R}", file=E)
+        print(f"  {DIM}대화는 안전하고 cc-baton hib wake 로 돌아옵니다. 그래도 재우려면 --force{R}", file=E)
         return 1
     if dry:
         print(f"{DIM}[dry]{R} {row['name']} ({row['pid']}, {row['rss']}MB) 를 재웁니다")
@@ -564,7 +563,7 @@ def cmd_sleep(argv):
     selfk = (row["pid"] == me) or (row["pid"] in set(ancestors()))
     if selfk:
         print(f"{MAG}💤{R} 이 세션을 재웁니다 — {row['rss']}MB. "
-              f"{DIM}깨우려면 이 탭에서 키를 누르거나 cc-hib wake{R}")
+              f"{DIM}깨우려면 이 탭에서 키를 누르거나 cc-baton hib wake{R}")
     ok, msg = do_sleep(row, "수동", selfkill=selfk)
     if not selfk:
         print(f"{GRN}✓{R} {row['name']} 재움 — {msg}" if ok else f"{RED}✗{R} {msg}")
@@ -709,7 +708,7 @@ def cmd_pick(argv):
 def cmd_resume(argv):
     """마커를 걷고 그 자리에서 세션을 되살린다. 목록 번호나 세션 ID 앞부분을 받는다."""
     if not argv:
-        print("사용법: cc-hib resume <번호|세션ID>", file=E)
+        print("사용법: cc-baton hib resume <번호|세션ID>", file=E)
         return 1
     token = argv[0]
     items = parked_list()
@@ -720,7 +719,7 @@ def cmd_resume(argv):
         hit = [x for x in items if x["sid"].startswith(token)]
         d = hit[0] if len(hit) == 1 else None
     if not d:
-        print(f"{RED}✗{R} '{token}' 에 맞는 세션이 없습니다. cc-hib list 로 확인하세요.", file=E)
+        print(f"{RED}✗{R} '{token}' 에 맞는 세션이 없습니다. cc-baton hib list 로 확인하세요.", file=E)
         return 1
     marker = PARKED / f"{d['sid']}.json"
     saved = _load(marker)
@@ -748,7 +747,7 @@ def cmd_restore(argv):
     if not items:
         print(f"{DIM}되살릴 세션이 없습니다.{R}")
         return 0
-    lines = [f"cc-hib resume {i}" for i in range(1, len(items) + 1)]
+    lines = [f"cc-baton hib resume {i}" for i in range(1, len(items) + 1)]
     if "--script" in argv:
         i = argv.index("--script")
         path = argv[i + 1] if i + 1 < len(argv) else "restore-sessions.sh"
@@ -771,7 +770,7 @@ def cmd_restore(argv):
               f"{DIM}{d.get('cwd')}{R}")
         print(f"     {CYA}{ln}{R}\n")
     print(f"  {DIM}탭을 새로 열고 각 줄을 실행하세요. 순서는 상관없습니다.{R}")
-    print(f"  {DIM}파일로 받으려면: cc-hib restore --script ~/restore.sh{R}\n")
+    print(f"  {DIM}파일로 받으려면: cc-baton hib restore --script ~/restore.sh{R}\n")
     return 0
 
 
@@ -801,5 +800,5 @@ def main():
     return 0 if r is None or r is True else (r if isinstance(r, int) else 0)
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+def cli():
+    return main()

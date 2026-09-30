@@ -13,7 +13,7 @@ def render(home, effort=None, columns=140, **env):
             "workspace": {"current_dir": str(home.root)}}
     if effort:
         data["effort"] = {"level": effort}
-    r = home.run("statusline.py", input=json.dumps(data), COLUMNS=columns, **env)
+    r = home.run("statusline", input=json.dumps(data), COLUMNS=columns, **env)
     assert r.returncode == 0, r.stderr
     return r.stdout.rstrip("\n").split("\n")
 

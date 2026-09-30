@@ -29,8 +29,7 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import cswap_state as st  # noqa: E402
+from . import state as st
 
 R, DIM, BOLD = "\033[0m", "\033[2m", "\033[1m"
 RED, YEL, GRN, CYA = "\033[38;5;196m", "\033[38;5;208m", "\033[38;5;42m", "\033[38;5;39m"
@@ -43,7 +42,7 @@ MODEL_SCOPED_RE = re.compile(r"reached your .+? limit", re.I)
 
 
 def onlimit_cfg():
-    """cc-accounts.json 의 "onLimit". 기본값은 cswap_state.FEATURE_DEFAULTS (HUD 와 공유)."""
+    """cc-accounts.json 의 "onLimit". 기본값은 state.FEATURE_DEFAULTS (HUD 와 공유)."""
     return st.feature("onLimit")
 
 
@@ -134,7 +133,7 @@ def cmd_request(argv, sid_override=None):
     if not os.environ.get("CC_SWAP_LOOP"):
         st.MARKER.unlink(missing_ok=True)
         print(f"{YEL}!{R} `cc` 래퍼 밖이라 자동 재기동이 안 된다. 종료 후 아래를 실행해라:\n")
-        print(f"  {BOLD}~/.claude/bin/cc-swap handoff {target['num']} --sid {sid} --src-profile {src_profile} && \\")
+        print(f"  {BOLD}cc-baton swap handoff {target['num']} --sid {sid} --src-profile {src_profile} && \\")
         print(f"  cswap run {target['num']} -- --resume {sid}{R}")
         return 3
 
@@ -155,7 +154,7 @@ def cmd_consume(argv):
         return 1
     st.MARKER.unlink(missing_ok=True)
     if time.time() - (req.get("requestedAt") or 0) > MARKER_TTL:
-        print(f"{DIM}[cc-swap] 오래된 스왑 요청을 무시했다.{R}", file=sys.stderr)
+        print(f"{DIM}[cc-baton] 오래된 스왑 요청을 무시했다.{R}", file=sys.stderr)
         return 1
 
     sid = req.get("sid") or ""
@@ -167,11 +166,11 @@ def cmd_consume(argv):
             print(f"{CYA}→{R} 대화 이관: {DIM}{src.name[:8]}… ({size // 1024}KB) → "
                   f"{req['targetLabel']} 프로필{R}", file=sys.stderr)
         except Exception as exc:
-            print(f"{YEL}![cc-swap] 트랜스크립트 복사 실패({exc}) — resume 없이 전환한다.{R}",
+            print(f"{YEL}![cc-baton] 트랜스크립트 복사 실패({exc}) — resume 없이 전환한다.{R}",
                   file=sys.stderr)
             sid = ""
     else:
-        print(f"{YEL}![cc-swap] 트랜스크립트를 못 찾았다 — resume 없이 전환한다.{R}", file=sys.stderr)
+        print(f"{YEL}![cc-baton] 트랜스크립트를 못 찾았다 — resume 없이 전환한다.{R}", file=sys.stderr)
         sid = ""
 
     print(f"{req['targetNum']}\t{sid}")
@@ -181,7 +180,7 @@ def cmd_consume(argv):
 def cmd_handoff(argv):
     rest = [a for a in argv if not a.startswith("-")]
     if not rest:
-        die("사용법: cc-swap handoff <계정> [--sid S] [--src-profile P]")
+        die("사용법: cc-baton swap handoff <계정> [--sid S] [--src-profile P]")
     target = st.resolve(rest[0]) or die(f"'{rest[0]}' 계정 없음")
     sid = ""
     src_profile = str(current_profile())
@@ -224,7 +223,7 @@ def hook_prompt(data):
         return 0
     args = (m.group(1) or "").split()
     _, out = _run_captured(cmd_request, args, sid_override=data.get("session_id") or "")
-    print(out or "[cc-swap] (출력 없음)", file=sys.stderr)
+    print(out or "[cc-baton] (출력 없음)", file=sys.stderr)
     return 2
 
 
@@ -265,7 +264,7 @@ def hook_limit(data):
         return 0
     msg = (data.get("last_assistant_message") or "").strip()
     if MODEL_SCOPED_RE.search(msg):
-        _emit(f"[cc-swap] 모델별 한도다: {msg} 계정 스왑보다 /model 전환이 먼저다. "
+        _emit(f"[cc-baton] 모델별 한도다: {msg} 계정 스왑보다 /model 전환이 먼저다. "
               "그래도 계정을 바꾸려면 /swap <계정> --yes")
         return 0
 
@@ -274,7 +273,7 @@ def hook_limit(data):
         try:
             req = json.loads(st.MARKER.read_text())
             if time.time() - (req.get("requestedAt") or 0) <= MARKER_TTL:
-                _emit(f"[cc-swap] 이미 {req.get('targetLabel')} 계정으로 예약돼 있다. "
+                _emit(f"[cc-baton] 이미 {req.get('targetLabel')} 계정으로 예약돼 있다. "
                       "Ctrl+D 를 누르면 이 대화 그대로 이어진다.")
                 return 0
         except Exception:
@@ -282,19 +281,19 @@ def hook_limit(data):
 
     target = pick_limit_target(cur, cfg)
     if not target:
-        _emit("[cc-swap] 한도 도달. 여유가 있는 다른 계정이 없다 — 리셋을 기다리거나 /swap 으로 직접 골라라.")
+        _emit("[cc-baton] 한도 도달. 여유가 있는 다른 계정이 없다 — 리셋을 기다리거나 /swap 으로 직접 골라라.")
         return 0
     tk = st.kind(target["num"])
     cross = st.crosses_boundary(cur, target["num"])
     if cross and not cfg["approveCrossing"]:
-        _emit(f"[cc-swap] 한도 도달. {target['label']}[{tk}] 로 넘어가려면 경계 교차 승인이 필요하다: "
+        _emit(f"[cc-baton] 한도 도달. {target['label']}[{tk}] 로 넘어가려면 경계 교차 승인이 필요하다: "
               f"/swap {target['label']} --yes")
         return 0
 
     rc, out = _run_captured(cmd_request, [target["num"], "--yes"],
                             sid_override=data.get("session_id") or "")
     pct = _five_hour_pct(target["num"])
-    head = f"[cc-swap] 한도 도달 → {target['label']}[{tk}]" + (f" (5h {pct:.0f}% 사용)" if pct is not None else "")
+    head = f"[cc-baton] 한도 도달 → {target['label']}[{tk}]" + (f" (5h {pct:.0f}% 사용)" if pct is not None else "")
     if rc == 0:
         _emit(f"{head} 로 예약됨. Ctrl+D 를 누르면 이 대화 그대로 이어진다."
               + (" · team↔personal 교차는 onLimit.approveCrossing 으로 사전 승인됨" if cross else ""))
@@ -333,7 +332,7 @@ def cmd_hook(argv):
         rc = hook_limit(data)
         _hook_log(kind, data, rc)
         return rc
-    die("사용법: cc-swap hook <prompt|limit>   (stdin 으로 훅 JSON)")
+    die("사용법: cc-baton swap hook <prompt|limit>   (stdin 으로 훅 JSON)")
 
 
 def main():
@@ -345,5 +344,5 @@ def main():
             "hook": cmd_hook}.get(cmd, lambda a: die(f"알 수 없는 서브커맨드: {cmd}"))(argv)
 
 
-if __name__ == "__main__":
-    sys.exit(main() or 0)
+def cli():
+    return main() or 0

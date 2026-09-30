@@ -1,0 +1,28 @@
+[project]
+name = "cc-baton"
+dynamic = ["version"]
+description = "Pass the baton between Claude Code accounts: full-context account swap + statusline HUD (macOS)"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"  # claude-swap 이 3.12+
+# 내부 저장 파일(sequence.json, cache/usage.json)을 직접 읽으므로 확인한 버전 범위로 묶는다.
+dependencies = ["claude-swap>=0.25,<0.27"]
+
+[project.scripts]
+cc-baton = "cc_baton.cli:main"
+
+[project.urls]
+Repository = "https://github.com/juunghyun/cc-baton"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "cc_baton/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cc_baton"]

@@ -8,23 +8,30 @@ macOS only. Built on [claude-swap](https://github.com/realiti4/claude-swap) (MIT
 
 ## Layout
 
+One command, `cc-baton <subcommand>`:
+
+| Subcommand | What |
+|---|---|
+| `swap` | In-session account swap: copies the one transcript to the target profile and resumes it. `/swap` and rate-limit hooks |
+| `pick` | Account picker shown at launch |
+| `statusline` | HUD: account, model + effort meter, context, per-account usage, feature switches |
+| `toggle` | Feature switches (`update`, `hib`, `swap`) shown on the HUD's third line |
+| `hib` | Hibernate idle sessions (kill the process, keep the tab and context) |
+| `update` | Keep Claude Code up to date before launch and swap |
+
 | Path | What |
 |---|---|
-| `bin/cc-swap` | In-session account swap: copies the one transcript to the target profile and resumes it. `/swap` and rate-limit hooks |
-| `bin/cc-pick` | Account picker shown at launch |
-| `bin/statusline.py` | HUD: account, model + effort meter, context, per-account usage, feature switches |
-| `bin/cc-toggle` | Feature switches (`update`, `hib`, `swap`) shown on the HUD's third line |
-| `bin/cc-hib` | Hibernate idle sessions (kill the process, keep the tab and context) |
-| `bin/cc-update` | Keep Claude Code up to date before launch and swap |
-| `bin/cswap_state.py` | Read-only access to claude-swap's on-disk state |
+| `cc_baton/` | The package (`state.py` reads claude-swap's on-disk state) |
 | `commands/` | `/swap`, `/sleep` slash commands |
 | `shell/cc.zsh` | `cc` launcher loop (pick account, run, relaunch on swap/wake) |
 | `config/cc-accounts.example.json` | Account kinds and feature settings |
 
+Requires Python 3.12+ (claude-swap does). Dev install: `uv tool install -e .`
+
 ## Tests
 
 ```sh
-uv run --no-project --with pytest python -m pytest tests -q
+uv run --group dev python -m pytest tests -q
 ```
 
 Each test builds a fake `$HOME` with claude-swap state and runs the scripts as real processes, so your own setup is never touched.

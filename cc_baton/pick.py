@@ -16,8 +16,7 @@ import tty as ttymod
 import unicodedata
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import cswap_state as st  # noqa: E402
+from . import state as st
 
 R, DIM, BOLD, REV = "\033[0m", "\033[2m", "\033[1m", "\033[7m"
 HIDE, SHOW = "\033[?25l", "\033[?25h"
@@ -223,5 +222,5 @@ def main():
     return 0
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+def cli():
+    return main()

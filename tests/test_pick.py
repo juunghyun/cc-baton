@@ -13,7 +13,7 @@ import time
 
 import pytest
 
-from conftest import BIN, plain, width
+from conftest import plain, width
 
 UP, DOWN = b"\x1b[A", b"\x1b[B"
 
@@ -21,7 +21,7 @@ UP, DOWN = b"\x1b[A", b"\x1b[B"
 def drive(home, cols, keys):
     pid, fd = pty.fork()
     if pid == 0:
-        os.execve(sys.executable, [sys.executable, str(BIN / "cc-pick")],
+        os.execve(sys.executable, [sys.executable, "-m", "cc_baton", "pick"],
                   home.env(CC_PICK_NO_REFRESH=1))
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 30, cols, 0, 0))
     out = b""

@@ -18,8 +18,7 @@ import time
 import unicodedata
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import cswap_state as st  # noqa: E402
+from . import state as st
 
 R = "\033[0m"
 DIM = "\033[2m"
@@ -202,7 +201,7 @@ def hib_loaded():
 
 
 def swap_target_exists(num, min_headroom):
-    """cc-swap pick_limit_target 과 같은 기준: 5h 여유가 기준 이상이거나 측정 없는 다른 계정."""
+    """swap.pick_limit_target 과 같은 기준: 5h 여유가 기준 이상이거나 측정 없는 다른 계정."""
     for a in st.accounts():
         if a["num"] == num:
             continue
@@ -332,7 +331,7 @@ def main():
     print("\n".join(lines))
 
 
-if __name__ == "__main__":
+def cli():
     try:
         main()
     except Exception as exc:  # statusline 은 무슨 일이 있어도 한 줄은 뱉는다

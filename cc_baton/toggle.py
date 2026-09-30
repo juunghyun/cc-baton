@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
 """기능 스위치. 값의 원본은 ~/.claude/cc-accounts.json, HUD 3행이 이걸 보여준다.
 
-  cc-toggle                        현황
-  cc-toggle update|hib|swap on|off 켜기/끄기
-  cc-toggle is-on update|hib|swap  스크립트용 (exit 0 = 켜짐)
+  cc-baton toggle                        현황
+  cc-baton toggle update|hib|swap on|off 켜기/끄기
+  cc-baton toggle is-on update|hib|swap  스크립트용 (exit 0 = 켜짐)
 
-  update  cc 실행·스왑 직전 Claude Code 최신화 (cc-update)
-  hib     유휴 세션 자동 재우기 (cc-hib tick). /sleep 수동 재우기는 끄지 않는다
-  swap    한도 도달 시 다른 계정으로 자동 스왑 예약 (cc-swap hook limit)
+  update  cc 실행·스왑 직전 Claude Code 최신화 (cc-baton update)
+  hib     유휴 세션 자동 재우기 (cc-baton hib tick). /sleep 수동 재우기는 끄지 않는다
+  swap    한도 도달 시 다른 계정으로 자동 스왑 예약 (cc-baton swap hook limit)
 """
 import json
 import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import cswap_state as st  # noqa: E402
+from . import state as st
 
 KEYS = {"update": "autoUpdate", "hib": "hibernate", "swap": "onLimit"}
 
@@ -30,7 +29,8 @@ def set_enabled(key, on):
     os.replace(tmp, path)
 
 
-def main(argv):
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
     if len(argv) == 2 and argv[0] == "is-on" and argv[1] in KEYS:
         return 0 if st.feature(KEYS[argv[1]])["enabled"] else 1
     if len(argv) == 2 and argv[0] in KEYS and argv[1] in ("on", "off"):
@@ -43,5 +43,5 @@ def main(argv):
     return 0
 
 
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+def cli():
+    return main()

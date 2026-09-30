@@ -13,7 +13,7 @@
 #   설치가 끝난 뒤엔 바이너리가 제자리에 돌아왔는지 확인하고 나서야 cswap 으로 넘어간다.
 #
 # 항상 exit 0 — 업데이트 확인/설치 실패가 claude 실행을 막으면 안 된다.
-# 끄기: CC_NO_UPDATE=1 cc ...
+# 끄기: cc-baton toggle update off (한 번만: CC_NO_UPDATE=1)
 
 PKG="@anthropic-ai/claude-code"
 NPM_PREFIX="${NPM_PREFIX:-$HOME/.npm-global}"
@@ -23,7 +23,7 @@ LOCK="$HOME/.local/state/cc-update.lock"
 R=$'\033[0m'; DIM=$'\033[2m'; BOLD=$'\033[1m'; GRN=$'\033[38;5;42m'; YEL=$'\033[38;5;208m'
 
 [[ -n "$CC_NO_UPDATE" ]] && exit 0
-"$(dirname "$0")/cc-toggle" is-on update || exit 0   # cc-toggle update off
+"${CC_BATON_PY:-python3}" -m cc_baton toggle is-on update || exit 0   # cc-baton toggle update off
 FAILED="${XDG_STATE_HOME:-$HOME/.local/state}/cc-swap/update-failed"   # HUD 3행이 ⚠실패 로 띄운다
 
 installed_version() {

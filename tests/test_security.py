@@ -99,7 +99,21 @@ def test_hib_resume_passes_session_as_arguments_not_shell_code(home):
     log = home.root / "zsh-args"
     home.fake("zsh", f'printf "%s\\n" "$@" > "{log}"')
     home.run("hib", "resume", "1")
-    assert log.read_text().splitlines() == ["-ic", 'baton "$1" -- --resume "$2"', "zsh", "2", SID]
+    args = log.read_text().splitlines()
+    assert args[0] == "-ic" and args[1].startswith('baton "$1" -- --resume "$2";') and args[2:5] == ["zsh", "2", SID]
+
+
+def test_hib_resume_puts_the_session_back_when_it_fails(home):
+    parked = home.state / "hib/parked"
+    parked.mkdir(parents=True)
+    marker = parked / f"{SID}.json"
+    marker.write_text(json.dumps({"sid": SID, "account": "2", "cwd": str(home.root), "name": "x", "hibernatedAt": time.time()}))
+    for rc, kept in ((1, True), (0, False)):
+        # 가짜 zsh: 받은 스크립트를 그대로 돌리되 baton 은 rc 로 끝난다
+        home.fake("zsh", f'shift; script="$1"; shift; exec /bin/zsh -fc "baton() {{ return {rc}; }}; $script" "$@"')
+        home.run("hib", "resume", "1")
+        assert marker.exists() is kept  # 실패하면 목록에 도로 올라오고, 성공하면 치운다
+        assert not (parked / ".resuming" / marker.name).exists()
 
 
 def test_restore_script_cannot_smuggle_commands(home):

@@ -134,7 +134,7 @@ def cmd_request(argv, sid_override=None):
         print(YEL + L(f"⚠ This swap crosses groups: {ck.upper()} → {tk.upper()}", f"⚠ 그룹이 다른 계정으로 옮깁니다: {ck.upper()} → {tk.upper()}") + R)
         print(L(f"  The whole transcript of this conversation will be copied to {tl} ({tk}),",
                 f"  이 대화의 트랜스크립트 전체가 {tl}({tk}) 프로필로 복사되고,"))
-        print(L(f"  and further requests will be billed to {tl}.", f"  이후 요청은 {tl} 계정의 사용량으로 처리됩니다."))
+        print(L(f"  and further requests will count against {tl}'s usage.", f"  이후 요청은 {tl} 계정의 사용량으로 처리됩니다."))
         print(L("  Make sure it's OK to move this conversation between these accounts (e.g. work ↔ personal).\n",
                 "  업무 대화를 개인 계정으로(또는 그 반대로) 옮겨도 되는지 확인하세요.\n"))
         print(L("  To go ahead: ", "  진행하려면: ") + f"{BOLD}/swap {rest[0]} --yes{R}")

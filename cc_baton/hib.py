@@ -751,7 +751,11 @@ def cmd_resume(argv):
         return 1
     marker = PARKED / f"{d['sid']}.json"
     saved = _load(marker)
-    marker.unlink(missing_ok=True)
+    # 목록에서는 바로 빼되 지우지는 않는다. 되살리기가 실패하면(0 이 아닌 종료) 셸이 도로 올려놓는다.
+    hold = PARKED / ".resuming" / marker.name
+    if marker.exists():
+        hold.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(marker, hold)
     cwd = d.get("cwd")
     if cwd and os.path.isdir(cwd):
         os.chdir(cwd)
@@ -761,10 +765,13 @@ def cmd_resume(argv):
         if acct:
             # 셸 문자열에 끼워 넣지 않고 인자로 넘긴다 (세션 ID·계정이 셸 코드로 해석되지 않게). baton 루프 안에서 이어져야
             # 다시 스왑·절전이 된다.
-            os.execvp("zsh", ["zsh", "-ic", 'baton "$1" -- --resume "$2"', "zsh", str(acct), d["sid"]])
+            run = 'baton "$1" -- --resume "$2"'
         else:
-            os.execvp("claude", ["claude", "--resume", d["sid"]])
+            run = 'claude --resume "$2"'
+        os.execvp("zsh", ["zsh", "-ic", run + '; rc=$?; if (( rc )); then [[ -f "$3" ]] && mv -f "$3" "$4"; '
+                          'else rm -f "$3"; fi; exit $rc', "zsh", str(acct or ""), d["sid"], str(hold), str(marker)])
     except OSError as e:
+        hold.unlink(missing_ok=True)
         if saved:
             _save(marker, saved)                # 못 띄웠으면 목록에 도로 올려둔다
         print(f"{RED}✗{R} " + L(f"failed to run: {e}", f"실행 실패: {e}"), file=E)

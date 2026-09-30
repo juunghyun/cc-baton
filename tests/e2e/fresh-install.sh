@@ -26,7 +26,7 @@ step "README 설치 블록 (저장소 주소만 이 커밋으로)"
 git -C "$REPO" checkout -q -B e2e
 block=$(awk '/^## Install/{f=1} f && /^```sh/{g=1; next} g && /^```/{exit} g' "$REPO/README.md")
 [[ -n "$block" ]] || fail "README 에서 설치 블록을 못 찾음"
-block=${block//git+https:\/\/github.com\/juunghyun\/cc-baton/git+file://$REPO@e2e}
+block=$(print -r -- "$block" | sed -E "s#git\+https://github.com/juunghyun/cc-baton(@[^ ]*)?#git+file://$REPO@e2e#")
 print -r -- "$block"
 eval "$block"
 command -v uv >/dev/null || fail "uv 가 PATH 에 없음"

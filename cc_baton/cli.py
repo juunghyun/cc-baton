@@ -18,7 +18,7 @@ def usage():
   install        Wire cc-baton into Claude Code (no questions, safe to re-run)
   setup          Setup wizard: language, account groups, HUD, sleep, auto-swap (runs on first `baton`)
   uninstall      Remove what cc-baton added (--purge: settings and state too, --yes: don't ask)
-  upgrade        Upgrade cc-baton and re-apply the wiring
+  upgrade        Upgrade cc-baton to the latest release and re-apply the wiring
   lang [en|ko]   Show or change the display language
 
   swap           Account swap: request <account> | consume | handoff <account> | hook prompt|limit
@@ -32,7 +32,7 @@ def usage():
   install        Claude Code 에 연결 (질문 없음, 여러 번 돌려도 같은 결과)
   setup          설정 위저드: 언어, 계정 그룹, HUD, 절전, 한도 자동 스왑 (baton 첫 실행 때 자동)
   uninstall      연결 제거 (--purge: 설정·기록까지, --yes: 묻지 않음)
-  upgrade        cc-baton 을 최신으로 올리고 다시 연결
+  upgrade        cc-baton 을 최신 릴리스로 올리고 다시 연결
   lang [en|ko]   화면 언어 보기/바꾸기
 
   swap           계정 스왑: request <계정> | consume | handoff <계정> | hook prompt|limit

@@ -11,6 +11,7 @@
 import json
 import os
 import plistlib
+import re
 import shlex
 import shutil
 import subprocess
@@ -734,8 +735,45 @@ def cmd_uninstall(argv):
 
 
 # ── upgrade ──────────────────────────────────────────────────────────────
+REPO_URL = "https://github.com/juunghyun/cc-baton"
+
+
+def latest_release():
+    """저장소의 가장 높은 vX.Y.Z 태그. 못 구하면 None."""
+    try:
+        out = subprocess.run(["git", "ls-remote", "--tags", "--refs", REPO_URL], capture_output=True, text=True,
+                             timeout=20).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    tags = [ln.rsplit("refs/tags/", 1)[-1] for ln in out.splitlines()]
+    vers = [(tuple(map(int, t[1:].split("."))), t) for t in tags if re.fullmatch(r"v\d+\.\d+\.\d+", t)]
+    return max(vers)[1] if vers else None
+
+
+def _editable():
+    from importlib.metadata import PackageNotFoundError, distribution
+    try:
+        info = json.loads(distribution("cc-baton").read_text("direct_url.json") or "{}")
+    except (PackageNotFoundError, ValueError):
+        return False
+    return bool((info.get("dir_info") or {}).get("editable"))
+
+
 def cmd_upgrade(argv):
-    rc = subprocess.call(["uv", "tool", "upgrade", "cc-baton"])
+    """설치는 릴리스 태그에 고정돼 있어 uv tool upgrade 로는 안 움직인다. 최신 태그로 다시 설치한다."""
+    from . import __version__
+    if _editable():
+        say(L("This is an editable (development) install; update it with git pull.",
+              "개발용(editable) 설치입니다. git pull 로 갱신하세요."))
+        return 1
+    tag = latest_release()
+    if not tag:
+        say(f"{RED}✗{R} " + L(f"Couldn't read releases from {REPO_URL}.", f"{REPO_URL} 에서 릴리스를 읽지 못했습니다."))
+        return 1
+    if tag[1:] == __version__:
+        say(L(f"Already the latest release ({tag}).", f"이미 최신 릴리스입니다 ({tag})."))
+        return 0
+    rc = subprocess.call(["uv", "tool", "install", "--reinstall", "--python", "3.12", f"git+{REPO_URL}@{tag}"])
     if rc != 0:
         return rc
     return subprocess.call([bin_path(), "install"])  # 새 버전의 연결 형식으로 다시 맞춘다

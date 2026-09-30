@@ -3,6 +3,7 @@ import json
 import subprocess
 
 import pytest
+from conftest import ROOT
 
 EXE = "/opt/cc-baton/bin/cc-baton"
 FOREIGN_STATUS = {"type": "command", "command": "~/my-status.sh"}
@@ -211,3 +212,12 @@ def test_settings_backups_are_capped(home, inst):
     inst("install")
     left = sorted(p.name for p in home.settings.parent.glob("settings.json.bak-cc-baton-*"))
     assert len(left) == 3 and "settings.json.bak-cc-baton-20260101000000" not in left  # 오래된 것부터 지운다
+
+
+def test_readme_installs_the_current_release():
+    """README 설치 명령이 가리키는 태그 = 패키지 버전 (릴리스 때 README 를 빠뜨리지 않게)."""
+    import re
+    from cc_baton import __version__
+    for name in ("README.md", "README.ko.md"):
+        pins = re.findall(r"github\.com/juunghyun/cc-baton@v([\d.]+)", (ROOT / name).read_text())
+        assert pins == [__version__], (name, pins)

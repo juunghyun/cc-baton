@@ -76,7 +76,8 @@ cc-baton 이 넣은 것만 걷어내고, 원래 쓰던 statusline 을 되돌립�
 - **업무 대화는 소속 조직의 것입니다.** 팀·엔터프라이즈 시트는 조직의 계약([상업 약관](https://www.anthropic.com/legal/commercial-terms))을 따르고, 입력과 출력은 조직 소유입니다. 개인 계정으로 옮긴 대화는 [소비자 약관](https://www.anthropic.com/legal/consumer-terms)을 따르며, 거부하지 않으면 모델 학습에 쓰일 수 있습니다. 그룹 확인이 옮기기 전에 한 번 묻습니다.
 - **로그인 정보는 claude-swap 이 저장합니다.** cc-baton 자체는 토큰을 읽지 않지만, 함께 설치되는 claude-swap 이 계정마다 Claude 로그인 사본을 이 Mac 에 보관하고 갱신합니다. Anthropic [Claude Code 약관](https://code.claude.com/docs/en/legal-and-compliance)은 Claude.ai 로그인 정보를 저장하는 외부 도구를 제한하니, 특히 업무 시트라면 읽어 보고 판단하세요.
 - **사용량 숫자는 선택입니다.** 설정에서 사용량 갱신을 켜면 claude-swap 이 계정마다 Anthropic 사용량 API 를 백그라운드로 조회합니다. 기본은 꺼져 있습니다.
-- claude-swap 의 상태 파일과 Claude Code 의 비공식 부분을 읽습니다. 확인한 환경: macOS 15.3, Claude Code 2.1.285, claude-swap 0.25–0.26.
+- **권한 확인은 끄기 전까지 그대로입니다.** 설정 위저드에서 `baton` 이 Claude Code 를 `--dangerously-skip-permissions` 로 열게 할 수 있고, 그러면 Claude 가 묻지 않고 명령을 실행합니다. 기본은 꺼져 있고, `cc-baton toggle bypass off` 로 다시 끌 수 있습니다.
+- claude-swap 의 상태 파일과 Claude Code 의 비공식 부분을 읽습니다. 확인한 환경: macOS 15.3, Claude Code 2.1.285, claude-swap 0.26.
 
 ## 더 보기
 

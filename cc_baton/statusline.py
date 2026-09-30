@@ -96,20 +96,25 @@ def maybe_refresh(age):
 
 
 def git_bit(cwd):
-    """(브랜치, 더티여부) 또는 None."""
+    """(브랜치, 더티여부) 또는 None.
+
+    10초마다 남의 저장소에서도 돈다. 저장소 설정(.git/config)에 심어 둔 명령이 실행되지 않게
+    fsmonitor·외부 diff·textconv 를 끄고, 잠금 파일도 만들지 않는다.
+    """
+    git = ["git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "--no-optional-locks", "-C", cwd]
     try:
         if not (Path(cwd) / ".git").exists():
-            r = subprocess.run(["git", "-C", cwd, "rev-parse", "--is-inside-work-tree"],
+            r = subprocess.run([*git, "rev-parse", "--is-inside-work-tree"],
                                capture_output=True, timeout=0.4, text=True)
             if r.returncode != 0:
                 return None
-        br = subprocess.run(["git", "-C", cwd, "rev-parse", "--abbrev-ref", "HEAD"],
+        br = subprocess.run([*git, "rev-parse", "--abbrev-ref", "HEAD"],
                             capture_output=True, timeout=0.4, text=True)
         if br.returncode != 0:
             return None
-        dirty = subprocess.run(["git", "-C", cwd, "diff", "--quiet"],
+        dirty = subprocess.run([*git, "diff", "--quiet", "--no-ext-diff", "--no-textconv"],
                                capture_output=True, timeout=0.4).returncode != 0
-        return (br.stdout.strip(), dirty)
+        return (st.clean(br.stdout.strip()), dirty)
     except Exception:
         return None
 
@@ -306,7 +311,7 @@ def main():
             budget = limit
         bshort = short_branch(g[0], cap=min(24, max(10, budget // 2))) if g else ""
         dcap = max(10, budget - (vislen(bshort) + 3 if bshort else 0))
-        seg = short_dir(cwd, cap=min(30, dcap))
+        seg = short_dir(st.clean(cwd), cap=min(30, dcap))
         if g:
             seg += f" {DIM}({bshort}{'*' if g[1] else ''}){R}"
         parts.append(seg)

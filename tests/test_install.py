@@ -152,7 +152,7 @@ def test_setup_wizard_in_terminal(home, inst):
                     return
 
     # 그룹: personal → side, team → 엔터(그대로) / 절전: 켜고 45분 / 자동 스왑: 끔
-    for answer in (b"ko\r", b"side\r", b"\r", b"y\r", b"45\r", b"n\r", b"n\r"):
+    for answer in (b"ko\r", b"side\r", b"\r", b"y\r", b"45\r", b"n\r", b"n\r", b"n\r"):
         pump(0.6)
         try:
             os.write(fd, answer)
@@ -166,7 +166,7 @@ def test_setup_wizard_in_terminal(home, inst):
     assert cfg["1"]["group"] == "side" and cfg["2"]["group"] == "team"
     assert cfg["hibernate"] == {"enabled": True, "idleMin": 45.0}
     assert cfg["onLimit"]["enabled"] is False and cfg["setup"]["done"] is True and cfg["language"] == "ko"
-    assert cfg["usageRefresh"] == {"enabled": False}
+    assert cfg["usageRefresh"] == {"enabled": False} and cfg["skipPermissions"] == {"enabled": False}
     import plistlib
     plist = plistlib.loads((home.root / "Library/LaunchAgents/io.github.juunghyun.cc-baton.hib.plist").read_bytes())
     assert plist["ProgramArguments"] == [EXE, "hib", "tick"]
@@ -192,6 +192,6 @@ def test_paths_under_home_are_written_with_dollar_home(home, inst):
     exe = str(home.root / ".local/bin/cc-baton")
     assert home.run("install", CC_BATON_BIN=exe).returncode == 0
     data = settings(home)
-    assert data["statusLine"]["command"] == "$HOME/.local/bin/cc-baton statusline"
-    assert "$HOME/.local/bin/cc-baton swap hook prompt" in our_commands(data)
+    assert data["statusLine"]["command"] == '"$HOME"/.local/bin/cc-baton statusline'
+    assert '"$HOME"/.local/bin/cc-baton swap hook prompt' in our_commands(data)
     assert str(home.root) not in json.dumps(data)  # settings.json 에 사용자 경로가 안 남는다

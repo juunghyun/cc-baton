@@ -36,7 +36,8 @@ R, DIM, BOLD = "\033[0m", "\033[2m", "\033[1m"
 RED, YEL, GRN, CYA = "\033[38;5;196m", "\033[38;5;208m", "\033[38;5;42m", "\033[38;5;39m"
 MARKER_TTL = 3600.0  # 이보다 오래된 요청은 무시 (예전 마커가 뒤늦게 발화하는 사고 방지)
 ANSI_RE = re.compile(r"\033\[[0-9;]*m")
-SWAP_CMD_RE = re.compile(r"^/swap(?:\s+(.*))?$", re.S)
+# 한 줄짜리 `/swap …` 만. 여러 줄 프롬프트의 뒷부분(붙여 넣은 글 속 --yes 등)이 인자로 섞이지 않게.
+SWAP_CMD_RE = re.compile(r"^/swap(?:[ \t]+([^\n]*))?$")
 # 계정 전체 한도("You've hit your session/weekly limit")가 아니라 모델별 한도
 # ("You've reached your Fable 5 limit. /model to switch models.")면 스왑이 아니라 /model 이 맞다.
 MODEL_SCOPED_RE = re.compile(r"reached your .+? limit", re.I)
@@ -69,6 +70,8 @@ def current_profile():
 
 
 def find_transcript(profile, sid):
+    if not st.valid_sid(sid):
+        return None
     if not sid:
         return None
     hits = sorted(Path(profile).glob(f"projects/*/{sid}.jsonl"))
@@ -133,7 +136,9 @@ def cmd_request(argv, sid_override=None):
         print(L("  To go ahead: ", "  진행하려면: ") + f"{BOLD}/swap {rest[0]} --yes{R}")
         return 2
 
-    st.STATE_DIR.mkdir(parents=True, exist_ok=True)
+    if sid and not st.valid_sid(sid):
+        die(L(f"Invalid session id: {sid!r}", f"세션 ID 가 올바르지 않습니다: {sid!r}"))
+    st.private_dir(st.STATE_DIR)
     st.MARKER.write_text(json.dumps({
         "targetNum": target["num"], "targetLabel": target["label"],
         "fromNum": cur, "sid": sid,
@@ -157,27 +162,40 @@ def cmd_request(argv, sid_override=None):
 
 
 def cmd_consume(argv):
-    """래퍼 전용. stdout 은 '<계정번호>\\t<세션ID>' 한 줄 (세션ID가 비면 resume 없이 새 세션)."""
+    """래퍼 전용. stdout 은 '<계정번호>\\t<세션ID>' 한 줄 (세션ID가 비면 resume 없이 새 세션).
+
+    예약 파일은 믿지 않는다: 대상 프로필은 계정 번호로 다시 계산하고, 출발 프로필은 claude-swap 이
+    관리하는 폴더일 때만, 세션 ID 는 형식이 맞을 때만 쓴다. 깨진 예약 파일은 조용히 버린다.
+    """
     if not st.MARKER.exists():
         return 1
     try:
         req = json.loads(st.MARKER.read_text())
+        requested = float(req.get("requestedAt") or 0)
+        target_num = str(req["targetNum"])
     except Exception:
         st.MARKER.unlink(missing_ok=True)
         return 1
     st.MARKER.unlink(missing_ok=True)
-    if time.time() - (req.get("requestedAt") or 0) > MARKER_TTL:
+    if time.time() - requested > MARKER_TTL:
         print(DIM + L("[cc-baton] Ignored a stale swap request.", "[cc-baton] 오래된 스왑 요청을 무시했다.") + R, file=sys.stderr)
         return 1
+    target = st.resolve(target_num)
+    dst_profile = st.profile_dir(target_num) if target else None
+    if not dst_profile:
+        print(YEL + L(f"![cc-baton] Account {target_num} is gone; not switching.", f"![cc-baton] {target_num}번 계정이 없어 전환하지 않는다.") + R,
+              file=sys.stderr)
+        return 1
 
-    sid = req.get("sid") or ""
-    src = find_transcript(req.get("srcProfile", ""), sid)
+    sid = str(req.get("sid") or "")
+    src_profile = str(req.get("srcProfile") or "")
+    src = find_transcript(src_profile, sid) if st.is_profile_dir(src_profile) else None
     if src:
         try:
-            dst = do_copy(src, req["dstProfile"])
+            dst = do_copy(src, dst_profile)
             size = dst.stat().st_size
             print(f"{CYA}→{R} " + L("Moving conversation: ", "대화 이관: ") + f"{DIM}{src.name[:8]}… ({size // 1024}KB) → "
-                  + L(f"{req['targetLabel']} profile", f"{req['targetLabel']} 프로필") + R, file=sys.stderr)
+                  + L(f"{target['label']} profile", f"{target['label']} 프로필") + R, file=sys.stderr)
         except Exception as exc:
             print(YEL + L(f"![cc-baton] Couldn't copy the transcript ({exc}); switching without resuming.",
                           f"![cc-baton] 트랜스크립트 복사 실패({exc}) — resume 없이 전환한다.") + R,
@@ -188,7 +206,7 @@ def cmd_consume(argv):
                       "![cc-baton] 트랜스크립트를 못 찾았다 — resume 없이 전환한다.") + R, file=sys.stderr)
         sid = ""
 
-    print(f"{req['targetNum']}\t{sid}")
+    print(f"{target_num}\t{sid}")
     return 0
 
 
@@ -326,7 +344,7 @@ def hook_limit(data):
 def _hook_log(kind, data, rc):
     """훅이 실제로 돌았는지 나중에 확인할 흔적. 실패해도 훅을 죽이지 않는다."""
     try:
-        st.STATE_DIR.mkdir(parents=True, exist_ok=True)
+        st.private_dir(st.STATE_DIR)
         head = (data.get("prompt") or data.get("last_assistant_message") or "")[:80].replace("\n", " ")
         with (st.STATE_DIR / "hook.log").open("a") as f:
             f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {kind} rc={rc} error={data.get('error')} "

@@ -31,7 +31,7 @@ FAILED="$STATE/update-failed"   # HUD 3행이 ⚠실패 로 띄운다
 
 installed_version() {
   [[ -f "$PKG_JSON" ]] || return 0
-  node -p "require('$PKG_JSON').version" 2>/dev/null
+  PKG_JSON="$PKG_JSON" node -p "require(process.env.PKG_JSON).version" 2>/dev/null
 }
 
 # npm 이 bin 을 치워둔 순간을 넘긴다. 치운 건 길어야 설치 한 번 길이다.

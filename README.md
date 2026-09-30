@@ -76,7 +76,8 @@ Removes only what cc-baton added and puts back the statusline you had. Your clau
 - **Work conversations belong to your organization.** Team and Enterprise seats are covered by your organization's agreement ([Commercial Terms](https://www.anthropic.com/legal/commercial-terms)), under which the organization owns its inputs and outputs. After a move to a personal account, the conversation is handled under the [Consumer Terms](https://www.anthropic.com/legal/consumer-terms), including use for model training unless you opt out. The group check asks before such a move.
 - **Logins are stored by claude-swap.** cc-baton itself never reads your tokens, but it installs claude-swap, which keeps a copy of each account's Claude login on this Mac and refreshes it. Anthropic's [Claude Code terms](https://code.claude.com/docs/en/legal-and-compliance) restrict third-party tools that store Claude.ai credentials; read them and decide whether this fits your accounts, especially work seats.
 - **Usage numbers are optional.** If you turn on usage refresh in setup, claude-swap asks Anthropic's usage endpoint for each of your accounts in the background. It's off by default.
-- cc-baton reads claude-swap's state files and parts of Claude Code that aren't official APIs. Tested with macOS 15.3, Claude Code 2.1.285 and claude-swap 0.25–0.26.
+- **Permission prompts stay on unless you turn them off.** The setup wizard can make `baton` start Claude Code with `--dangerously-skip-permissions`, which lets Claude run commands without asking. It's off by default; `cc-baton toggle bypass off` turns it off again.
+- cc-baton reads claude-swap's state files and parts of Claude Code that aren't official APIs. Tested with macOS 15.3, Claude Code 2.1.285 and claude-swap 0.26.
 
 ## More
 

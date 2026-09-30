@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"  # claude-swap 이 3.12+
 # 내부 저장 파일(sequence.json, cache/usage.json)을 직접 읽으므로 확인한 버전 범위로 묶는다.
-dependencies = ["claude-swap>=0.25,<0.27"]
+dependencies = ["claude-swap==0.26.0"]  # 로그인 정보를 다루는 도구라 확인한 버전 하나로 고정
 
 [project.scripts]
 cc-baton = "cc_baton.cli:main"

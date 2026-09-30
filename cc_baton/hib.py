@@ -373,7 +373,7 @@ def cmd_scan(argv):
 def notify(title, msg):
     try:
         subprocess.run(["osascript", "-e",
-                        f'display notification {json.dumps(msg)} with title {json.dumps(title)}'],
+                        f'display notification {json.dumps(msg, ensure_ascii=False)} with title {json.dumps(title, ensure_ascii=False)}'],
                        capture_output=True, timeout=10)
     except Exception:
         pass
@@ -602,7 +602,7 @@ def cmd_claim(argv):
     if not d:
         return 1
     f.unlink(missing_ok=True)
-    if time.time() - d.get("hibernatedAt", 0) > REQ_TTL:
+    if time.time() - d.get("hibernatedAt", 0) > REQ_TTL or not st.valid_sid(d.get("sid")):
         return 1                                            # 낡은 요청 — tty 재사용 사고 방지
     print(d["sid"])
     return 0
@@ -610,9 +610,9 @@ def cmd_claim(argv):
 
 def cmd_banner(argv):
     sid = argv[0] if argv else ""
-    d = _load(PARKED / f"{sid}.json") or {}
-    name = d.get("name") or sid[:8]
-    cwd = d.get("cwd") or ""
+    d = (_load(PARKED / f"{sid}.json") or {}) if st.valid_sid(sid) else {}
+    name = st.clean(d.get("name") or sid[:8])
+    cwd = st.clean(d.get("cwd") or "")
     rss = d.get("rss")
     when = datetime.datetime.fromtimestamp(d.get("hibernatedAt", time.time())).strftime("%H:%M")
     # 탭 제목. claude 가 죽으면 탭이 'zsh' 로 돌아가 어느 세션인지 모른다. 깨우면 claude 가 다시 덮어쓴다.
@@ -629,7 +629,7 @@ def cmd_banner(argv):
 def cmd_wake(argv):
     sid = argv[0] if argv else ""
     f = PARKED / f"{sid}.json"
-    if not f.exists():                                      # 다른 데서 이미 깨움
+    if not st.valid_sid(sid) or not f.exists():                                      # 다른 데서 이미 깨움
         print("  " + L("This session was already woken somewhere else.", "이 세션은 다른 곳에서 이미 깨어났습니다."))
         return 1
     f.unlink(missing_ok=True)
@@ -697,8 +697,8 @@ def cmd_list(argv):
         when = (datetime.datetime.fromtimestamp(d["hibernatedAt"]).strftime("%m-%d %H:%M")
                 if d.get("hibernatedAt") else "—")
         c = MAG if d["origin"] == "재움" else YEL
-        print(f"{i:>3} {c}{otxt(d['origin']):<5}{R} {when:<12} {str(d.get('name'))[:15]:<15} "
-              f"{str(d.get('account') or '-'):<4} {d.get('cwd')}")
+        print(f"{i:>3} {c}{otxt(d['origin']):<5}{R} {when:<12} {st.clean(d.get('name'))[:15]:<15} "
+              f"{str(d.get('account') or '-'):<4} {st.clean(d.get('cwd'))}")
     return 0
 
 
@@ -714,7 +714,7 @@ def cmd_pick(argv):
                 if d.get("hibernatedAt") else "—")
         c = MAG if d["origin"] == "재움" else YEL
         print(f"   {BOLD}{i}{R}) {c}{otxt(d['origin'])}{R} {DIM}{when}{R}  "
-              f"{BOLD}{str(d.get('name'))[:18]}{R}  {DIM}{d.get('cwd')}{R}", file=E)
+              f"{BOLD}{st.clean(d.get('name'))[:18]}{R}  {DIM}{st.clean(d.get('cwd'))}{R}", file=E)
     print("\n  " + L("Pick a number (Enter to cancel): ", "번호 선택 (Enter 취소): "), end="", file=E, flush=True)
     try:
         s = input().strip()
@@ -735,7 +735,7 @@ def cmd_resume(argv):
         print(L("usage: cc-baton hib resume <number|session id>", "사용법: cc-baton hib resume <번호|세션ID>"), file=E)
         return 1
     token = argv[0]
-    items = parked_list()
+    items = [x for x in parked_list() if st.valid_sid(x.get("sid"))]
     d = None
     if token.isdigit() and 1 <= int(token) <= len(items):
         d = items[int(token) - 1]
@@ -755,7 +755,9 @@ def cmd_resume(argv):
     print(f"{MAG}↻{R} " + L(f"restoring {d.get('name')}", f"{d.get('name')} 복원") + f" — {DIM}{cwd}{R}")
     try:
         if acct:
-            os.execvp("zsh", ["zsh", "-ic", f"cc {acct} -- --resume {d['sid']}"])
+            # 셸 문자열에 끼워 넣지 않고 인자로 넘긴다 (세션 ID·계정이 셸 코드로 해석되지 않게). baton 루프 안에서 이어져야
+            # 다시 스왑·절전이 된다.
+            os.execvp("zsh", ["zsh", "-ic", 'baton "$1" -- --resume "$2"', "zsh", str(acct), d["sid"]])
         else:
             os.execvp("claude", ["claude", "--resume", d["sid"]])
     except OSError as e:
@@ -777,7 +779,7 @@ def cmd_restore(argv):
         path = argv[i + 1] if i + 1 < len(argv) else "restore-sessions.sh"
         body = "#!/bin/zsh\n# " + L("Each session needs its own tab. Run one line per tab.", "세션 하나당 탭 하나가 필요합니다. 아래를 각 탭에서 한 줄씩 실행하세요.") + "\n"
         for d, ln in zip(items, lines):
-            body += f"# {d.get('name')}  {d.get('cwd')}\n# {ln}\n"
+            body += f"# {st.clean(d.get('name'))}  {st.clean(d.get('cwd'))}\n# {ln}\n"  # 줄바꿈이 명령 줄이 되지 않게
         pathlib_write = Path(path)
         pathlib_write.write_text(body)
         os.chmod(path, 0o755)
@@ -790,8 +792,8 @@ def cmd_restore(argv):
         when = (datetime.datetime.fromtimestamp(d["hibernatedAt"]).strftime("%m-%d %H:%M")
                 if d.get("hibernatedAt") else "—")
         c = MAG if d["origin"] == "재움" else YEL
-        print(f"   {c}{otxt(d['origin'])}{R} {DIM}{when}{R}  {BOLD}{str(d.get('name'))[:16]:<16}{R} "
-              f"{DIM}{d.get('cwd')}{R}")
+        print(f"   {c}{otxt(d['origin'])}{R} {DIM}{when}{R}  {BOLD}{st.clean(d.get('name'))[:16]:<16}{R} "
+              f"{DIM}{st.clean(d.get('cwd'))}{R}")
         print(f"     {CYA}{ln}{R}\n")
     print(f"  {DIM}" + L("Open a new tab for each line and run it. Any order works.", "탭을 새로 열고 각 줄을 실행하세요. 순서는 상관없습니다.") + R)
     print(f"  {DIM}" + L("To save them to a file: cc-baton hib restore --script ~/restore.sh",
@@ -812,7 +814,8 @@ def cmd_clean(argv):
 
 
 def main():
-    STATE.mkdir(parents=True, exist_ok=True)
+    st.private_dir(st.STATE_DIR)
+    st.private_dir(STATE)
     for d in (REQ, PARKED, PENDING, CAP):
         d.mkdir(parents=True, exist_ok=True)
     cmds = {"scan": cmd_scan, "tick": cmd_tick, "sleep": cmd_sleep, "claim": cmd_claim,

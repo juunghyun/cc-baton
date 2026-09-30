@@ -4,7 +4,7 @@
 #   baton personal        계정 지정 실행 (번호/별칭/이메일)
 #   baton personal -- -c  '--' 뒤는 claude 로 그대로 전달
 #   baton --wake          재운 세션을 골라 그 자리에서 깨운다
-# 항상 bypass permissions 로 연다. 끄려면 CC_NO_BYPASS=1 baton ...
+# 권한 확인 건너뛰기(--dangerously-skip-permissions)는 사용자가 켰을 때만 (cc-baton toggle bypass on|off, 한 번만 끄기: CC_NO_BYPASS=1).
 # 세션 안에서 /swap 을 쓰면 마커가 남고, claude 종료 시 이 루프가 대화를 이관해 재개한다.
 baton() {
   local b="${CC_BATON_BIN:-cc-baton}"
@@ -29,9 +29,9 @@ baton() {
   [[ "$1" == "--" ]] && shift
   args=("$@")
 
-  # bypass permissions 기본 ON. 사용자가 직접 권한 플래그를 넘겼으면 건드리지 않는다.
+  # 권한 확인 건너뛰기는 설정에서 켰을 때만. 사용자가 직접 권한 플래그를 넘겼으면 건드리지 않는다.
   if [[ -z "$CC_NO_BYPASS" && "${args[*]}" != *"--permission-mode"* \
-        && "${args[*]}" != *"--dangerously-skip-permissions"* ]]; then
+        && "${args[*]}" != *"--dangerously-skip-permissions"* ]] && "$b" toggle is-on bypass; then
     bypass=(--dangerously-skip-permissions)
   fi
 

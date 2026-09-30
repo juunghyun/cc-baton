@@ -11,6 +11,7 @@
 import json
 import os
 import plistlib
+import shlex
 import shutil
 import subprocess
 import sys
@@ -63,14 +64,40 @@ def bin_path():
 
 
 def shell_path(exe):
-    """훅·statusline 명령에 쓸 경로. 홈 아래면 $HOME/… (Claude Code 가 셸로 실행하므로 풀린다).
-    settings.json 이 사용자 이름과 무관해지고, 화면에 찍히는 훅 경로에도 계정 이름이 안 나온다."""
+    """훅·statusline 명령에 쓸 경로 (셸로 실행된다). 홈 아래면 "$HOME"/… 로 써서 settings.json 이 사용자 이름과
+    무관해지고, 화면에 찍히는 훅 경로에도 계정 이름이 안 나온다. 공백·특수문자는 셸 인용."""
     home = str(Path.home())
-    return "$HOME" + exe[len(home):] if exe.startswith(home + "/") else exe
+    if exe.startswith(home + "/"):
+        return '"$HOME"' + shlex.quote(exe[len(home):])
+    return shlex.quote(exe)
+
+
+OUR_SUBCOMMANDS = ("swap hook prompt", "swap hook limit", "statusline")
 
 
 def _ours(cmd):
-    return "cc-baton" in str(cmd) or "/.claude/bin/cc-swap" in str(cmd)  # 뒤는 0.1 이전 수동 설치
+    """우리가 쓴 명령인가. 이름에 'cc-baton' 이 들어간 남의 스크립트까지 지우지 않게 정확히 맞춘다."""
+    try:
+        tokens = shlex.split(str(cmd or ""))
+    except ValueError:
+        return False
+    if len(tokens) < 2:
+        return False
+    exe, rest = os.path.basename(tokens[0]), " ".join(tokens[1:])
+    if exe == "cc-baton":
+        return rest in OUR_SUBCOMMANDS
+    return exe == "cc-swap" and "/.claude/bin/" in tokens[0] and rest in ("hook prompt", "hook limit")  # 0.1 이전 수동 설치
+
+
+def _our_command_file(f):
+    """~/.claude/commands 의 파일이 우리가 넣은 것인가 (표시가 있거나, 0.1 이전의 레포 링크)."""
+    if f.is_symlink():
+        target = os.readlink(f)
+        return target.endswith((f"cc_baton/data/commands/{f.name}", f"cc-baton/commands/{f.name}"))
+    try:
+        return CMD_MARK in f.read_text()
+    except OSError:
+        return False
 
 
 def _read_json(path, default):
@@ -81,11 +108,7 @@ def _read_json(path, default):
 
 
 def _write_json(path, data):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
-    os.replace(tmp, path)
+    st.write_json(path, data)  # 원래 권한 유지 (settings.json 에 API 키가 있을 수 있다)
 
 
 class Settings:
@@ -148,11 +171,9 @@ def install_commands(exe):
     COMMANDS_DIR.mkdir(parents=True, exist_ok=True)
     for src in sorted((DATA / "commands").glob("*.md")):
         dst = COMMANDS_DIR / src.name
-        body = src.read_text().replace("{cc_baton}", exe).rstrip("\n") + "\n\n" + CMD_MARK + "\n"
+        body = src.read_text().replace("{cc_baton}", shell_path(exe)).rstrip("\n") + "\n\n" + CMD_MARK + "\n"
         if dst.exists() or dst.is_symlink():
-            mine = dst.is_symlink() and "cc-baton" in os.readlink(dst) or (
-                dst.exists() and CMD_MARK in dst.read_text())
-            if not mine:
+            if not _our_command_file(dst):
                 out.append((dst, L("skipped (you already have a different command with this name)", "건너뜀 (같은 이름의 다른 명령이 있음)")))
                 continue
             if dst.is_symlink():
@@ -166,8 +187,9 @@ def install_commands(exe):
 
 
 def zsh_block(exe):
-    return (f'{ZSH_BEGIN}\nexport CC_BATON_BIN="{exe}"\n'
-            f'[[ -f "{DATA / "baton.zsh"}" ]] && source "{DATA / "baton.zsh"}"\n{ZSH_END}\n')
+    src = shlex.quote(str(DATA / "baton.zsh"))
+    return (f'{ZSH_BEGIN}\nexport CC_BATON_BIN={shlex.quote(exe)}\n'
+            f'[[ -f {src} ]] && source {src}\n{ZSH_END}\n')
 
 
 def _strip_block(text):
@@ -214,6 +236,12 @@ def migrate_state():
     moved = []
     for old, new in st.LEGACY_STATE.items():
         if old.is_dir() and not old.is_symlink():
+            try:
+                o, n = old.resolve(), new.resolve()
+            except OSError:
+                continue
+            if n == o or o in n.parents:  # 새 위치가 옛 폴더를 가리키는 링크면 합치다 지워 버린다
+                continue
             _merge_into(old, new)
             shutil.rmtree(old)
             old.symlink_to(new)
@@ -293,6 +321,8 @@ def cmd_install(argv):
 
     report = []
     report += [L(f"state folder moved: {m}", f"상태 폴더 이관: {m}") for m in migrate_state()]
+    st.private_dir(st.STATE_DIR)
+    st.private_dir(st.CONFIG_PATH.parent)
 
     merge_hooks(s.data, exe)
     inst = _read_json(INSTALL_STATE, {})
@@ -508,9 +538,23 @@ def cmd_setup(argv):
         save_config(usageRefresh={"enabled": on})
         w("  → " + (L("on", "켰습니다") if on else L("off (numbers update when you run `cswap list`)", "껐습니다 (`cswap list` 를 실행하면 갱신됩니다)")))
 
-        # 6) 따로 깔린 claude-swap
+        # 6) 권한 확인 건너뛰기 (--dangerously-skip-permissions)
+        w("\n" + BOLD + L("6. Permission prompts", "6. 권한 확인") + R + " " + DIM
+          + L("— Claude Code normally asks before running commands or editing files",
+              "— Claude Code 는 명령을 실행하거나 파일을 고치기 전에 묻습니다") + R)
+        w(f"  {YEL}" + L("Skipping them (--dangerously-skip-permissions) lets Claude run anything without asking, "
+                         "including whatever a malicious file or web page tells it to.",
+                         "건너뛰면(--dangerously-skip-permissions) Claude 가 묻지 않고 무엇이든 실행합니다. "
+                         "악의적인 파일이나 웹 페이지가 시키는 일까지 포함됩니다.") + R)
+        on = t.yes("  " + L("Start sessions from baton with permission prompts skipped?", "baton 으로 여는 세션에서 권한 확인을 건너뛸까요?"),
+                   st.feature("skipPermissions")["enabled"])
+        save_config(skipPermissions={"enabled": on})
+        w("  → " + (L("skipped (turn off: cc-baton toggle bypass off)", "건너뜁니다 (끄기: cc-baton toggle bypass off)") if on
+                    else L("Claude Code will ask as usual", "평소처럼 묻습니다")))
+
+        # 7) 따로 깔린 claude-swap
         if _separate_claude_swap():
-            w("\n" + BOLD + "6. claude-swap" + R + " " + DIM
+            w("\n" + BOLD + "7. claude-swap" + R + " " + DIM
               + L("— you have claude-swap installed separately. Your account data stays as it is",
                   "— 따로 설치된 claude-swap 이 있습니다. 계정 데이터는 그대로 씁니다") + R)
             if t.yes("  " + L("Remove it and use the version bundled with cc-baton?", "정리하고 cc-baton 에 들어 있는 버전을 쓸까요?"), True):
@@ -576,7 +620,7 @@ def cmd_uninstall(argv):
                                        else L("no change", "변경 없음")))
 
     for f in sorted(COMMANDS_DIR.glob("*.md")) if COMMANDS_DIR.exists() else []:
-        if (f.is_symlink() and "cc-baton" in os.readlink(f)) or (f.exists() and CMD_MARK in f.read_text()):
+        if _our_command_file(f):
             f.unlink()
             report.append(L(f"command {f.name}: removed", f"명령 {f.name}: 제거"))
     if ZSHRC.exists():
@@ -595,7 +639,7 @@ def cmd_uninstall(argv):
         link.unlink()
         if ask(L("Keep using claude-swap (cswap)? It will be installed on its own.",
                  "claude-swap(cswap) 은 계속 쓰시겠어요? 따로 다시 설치해 둡니다."), False):
-            ok = subprocess.run(["uv", "tool", "install", "claude-swap>=0.25,<0.27"], capture_output=True).returncode == 0
+            ok = subprocess.run(["uv", "tool", "install", "claude-swap==0.26.0"], capture_output=True).returncode == 0
             report.append(L("cswap: installed on its own", "cswap: 따로 설치") if ok
                           else L("cswap: install failed (uv tool install claude-swap)", "cswap: 설치 실패 (uv tool install claude-swap)"))
         else:

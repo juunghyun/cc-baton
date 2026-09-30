@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import time
 import unicodedata
 from datetime import datetime, timezone
@@ -30,6 +31,50 @@ STATE_DIR = _STATE_ROOT / "cc-baton"
 LEGACY_STATE = {_STATE_ROOT / "cc-swap": STATE_DIR, _STATE_ROOT / "cc-hib": STATE_DIR / "hib"}
 MARKER = STATE_DIR / "request.json"
 REFRESH_STAMP = STATE_DIR / "usage-refresh.stamp"
+
+
+# 세션 ID 는 경로·glob 에 들어간다. 슬래시·와일드카드·.. 가 못 들어오게 좁힌다.
+SID_RE = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._-]{0,127}$")
+_CTRL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def valid_sid(sid):
+    return bool(sid) and bool(SID_RE.match(str(sid))) and ".." not in str(sid)
+
+
+def clean(text):
+    """화면에 찍을 외부 문자열(별칭·경로·세션 이름)에서 제어문자를 뺀다. 터미널 제어 시퀀스 주입 방지."""
+    return _CTRL.sub("", str(text or ""))
+
+
+def private_dir(path):
+    """상태·설정 폴더는 본인만 읽게 (0700). macOS 홈은 staff 그룹이 들어올 수 있다."""
+    p = Path(path)
+    p.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(p, 0o700)
+    except OSError:
+        pass
+    return p
+
+
+def write_json(path, data):
+    """원자적으로 쓰되 원래 파일 권한을 유지한다 (새 파일은 0600). 임시 파일 이름도 겹치지 않게."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = path.stat().st_mode & 0o777
+    except FileNotFoundError:
+        mode = 0o600
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
 
 
 def _load(path, default):
@@ -58,7 +103,7 @@ def accounts():
             "num": str(n),
             "email": a.get("email", ""),
             "alias": alias,
-            "label": alias or a.get("email", ""),
+            "label": clean(alias or a.get("email", "")),
         })
     return out
 
@@ -103,6 +148,15 @@ def profile_dir(num):
         if a["num"] == num:
             return SESSIONS_DIR / f"{num}-{slugify_email(a['email'])}"
     return None
+
+
+def is_profile_dir(path):
+    """claude-swap 이 관리하는 프로필 폴더인가 (~/.claude 또는 sessions/<n>-<email>). 예약 파일을 믿지 않기 위해."""
+    try:
+        p = Path(path).resolve()
+    except (OSError, TypeError):
+        return False
+    return p == (Path.home() / ".claude").resolve() or p.parent == SESSIONS_DIR.resolve()
 
 
 def current_num():
@@ -190,7 +244,7 @@ def config_path():
     """설정 파일 경로. 새 위치에 없고 예전 위치에 있으면 복사해 온다 (예전 파일은 남겨 둔다)."""
     if not CONFIG_PATH.exists() and LEGACY_CONFIG.exists():
         try:
-            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            private_dir(CONFIG_PATH.parent)
             tmp = CONFIG_PATH.with_suffix(".json.tmp")
             shutil.copy2(LEGACY_CONFIG, tmp)
             os.replace(tmp, CONFIG_PATH)  # statusline 이 동시에 읽어도 반쪽 파일을 보지 않게
@@ -260,9 +314,9 @@ def last_used(num):
 
 
 def crosses_boundary(src_num, dst_num):
-    """그룹 경계를 넘는 이동인가 (둘 다 그룹이 정해져 있을 때만 True)."""
+    """그룹 경계를 넘는 이동인가. 그룹을 아직 안 정한 계정이 끼면 안전하게 넘는 것으로 본다."""
     a, b = group(src_num), group(dst_num)
-    return "unknown" not in (a, b) and a != b
+    return a != b or "unknown" in (a, b)
 
 
 # --- 기능 스위치 (cc-toggle 로 켜고 끄고, HUD 3행이 보여준다) : 같은 파일의 최상위 키 ---
@@ -273,6 +327,8 @@ FEATURE_DEFAULTS = {
     "onLimit": {"enabled": False, "approveCrossing": False, "minHeadroomPct": 15},
     # claude-swap 이 계정마다 Anthropic 사용량 API 를 부른다. 스크립트가 도는 접근이라 사용자가 켤 때만.
     "usageRefresh": {"enabled": False},
+    # baton 이 Claude Code 를 --dangerously-skip-permissions 로 띄울지. 권한 확인이 사라지므로 사용자가 켤 때만.
+    "skipPermissions": {"enabled": False},
 }
 UPDATE_FAILED = STATE_DIR / "update-failed"  # claude-update 가 설치 실패 시 남긴다
 HIB_LABEL = "io.github.juunghyun.cc-baton.hib"  # hib tick 을 돌리는 launchd 에이전트

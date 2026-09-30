@@ -117,11 +117,12 @@ cc-baton 은 자기와 같이 설치된 버전만 부른다.
   줄 끝을 `\r\n` 으로 해서 선택 후 메시지가 줄 맨 앞에서 시작
 - 위저드 5단계(claude-swap 정리) 결과 문구
 
-### 7. 문서 + CI (S~M)
+### 7. 문서 + CI (S~M) — 완료 (화면 GIF 는 작성자가 녹화)
 
-- 화면 문구 영어화 (지금은 한국어). 한국어는 README.ko.md 로
-- README (영어) + README.ko.md: 핵심 가치, 설치, 화면 GIF, 요구사항(claude-swap, Python 3.12+, zsh, truecolor 터미널), 약관·팀 계정 주의, 호환 확인 버전
-- GitHub Actions: macOS 테스트, 비밀값 스캔
+- 화면 문구 영어·한국어 두 언어 (`L("English", "한국어")`, `cc-baton lang`, 위저드 첫 단계)
+- README (영어) + README.ko.md: HUD 예시, 기능, 설치, 에이전트 섹션, 명령, 제거, 쓰기 전 주의, 확인한 환경, 동작 방식
+- GitHub Actions: macOS 테스트, gitleaks 비밀값 스캔
+- 남은 것: 화면 GIF (Warp 에서 녹화해 README 상단 텍스트 예시를 대체)
 
 ### 8. 공개 (S)
 

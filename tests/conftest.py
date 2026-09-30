@@ -6,6 +6,7 @@ launchctl·curl 은 PATH 앞의 가짜 명령으로 대체한다.
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -103,7 +104,8 @@ class Home:
         e = {
             "HOME": str(self.root),
             # 스크립트 shebang 의 python3 가 테스트와 같은 인터프리터를 잡게 한다.
-            "PATH": f"{self.fakebin}:{Path(sys.executable).parent}:/usr/bin:/bin",
+            # 테스트를 돌리는 쪽과 같은 git (CI 의 /usr/bin/git 은 Xcode shim 이라 가짜 HOME 에서 느리다)
+            "PATH": f"{self.fakebin}:{Path(sys.executable).parent}:{Path(shutil.which('git') or '/usr/bin/git').parent}:/usr/bin:/bin",
             "LANG": "en_US.UTF-8",
             "USER": "tester",
             "CC_BATON_LANG": "ko",  # 기존 검증 문구가 한국어. 영어는 테스트마다 CC_BATON_LANG=en

@@ -16,7 +16,15 @@
 # 끄기: cc-baton toggle update off (한 번만: CC_NO_UPDATE=1)
 
 PKG="@anthropic-ai/claude-code"
-NPM_PREFIX="${NPM_PREFIX:-$(npm prefix -g 2>/dev/null)}"
+# npm 전역 경로: PATH 의 claude 가 npm 설치본이면 그 경로에서 바로 얻는다 (npm prefix -g 는 0.1초 걸린다).
+if [[ -z "${NPM_PREFIX:-}" ]]; then
+  real="$(realpath "$(command -v claude 2>/dev/null)" 2>/dev/null)"
+  if [[ "$real" == */lib/node_modules/@anthropic-ai/claude-code/* ]]; then
+    NPM_PREFIX="${real%%/lib/node_modules/*}"
+  else
+    NPM_PREFIX="$(npm prefix -g 2>/dev/null)"
+  fi
+fi
 PKG_JSON="$NPM_PREFIX/lib/node_modules/$PKG/package.json"
 BIN="$NPM_PREFIX/bin/claude"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/cc-baton"
@@ -34,7 +42,12 @@ command -v npm >/dev/null && command -v node >/dev/null && [[ -n "$NPM_PREFIX" ]
 
 installed_version() {
   [[ -f "$PKG_JSON" ]] || return 0
-  PKG_JSON="$PKG_JSON" node -p "require(process.env.PKG_JSON).version" 2>/dev/null
+  # node 를 띄우지 않고 읽는다. package.json 최상위 "version" 이 첫 번째로 나온다
+  local v
+  v="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$PKG_JSON" | head -n1)"
+  # 모양이 달라 못 읽으면 node 로 (빈 값이면 매 실행 재설치로 이어진다)
+  [[ -n "$v" ]] || v="$(PKG_JSON="$PKG_JSON" node -p "require(process.env.PKG_JSON).version" 2>/dev/null)"
+  printf '%s' "$v"
 }
 
 # npm 이 bin 을 치워둔 순간을 넘긴다. 치운 건 길어야 설치 한 번 길이다.
@@ -72,9 +85,16 @@ acquire_lock() {
 
 installed="$(installed_version)"
 
-# 레지스트리 조회는 5초 안에 못 받으면 포기(오프라인·VPN). 그냥 깔린 걸로 켠다.
-latest="$(curl -fsS --max-time 5 "https://registry.npmjs.org/$PKG/latest" 2>/dev/null \
-  | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" 2>/dev/null)"
+# 최신 버전은 30분에 한 번만 레지스트리에 묻는다. 매 실행·매 /swap 재기동마다 묻으면 0.5~1초씩 늦어진다.
+CHECKED="$STATE/claude-latest"
+latest=""
+[[ -n "$(find "$CHECKED" -mmin -30 2>/dev/null)" ]] && latest="$(cat "$CHECKED" 2>/dev/null)"
+if [[ -z "$latest" ]]; then
+  # 레지스트리 조회는 5초 안에 못 받으면 포기(오프라인·VPN). 그냥 깔린 걸로 켠다.
+  latest="$(curl -fsS --max-time 5 "https://registry.npmjs.org/$PKG/latest" 2>/dev/null \
+    | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" 2>/dev/null)"
+  [[ -n "$latest" ]] && mkdir -p "$STATE" && printf '%s\n' "$latest" > "$CHECKED"
+fi
 
 if [[ -z "$latest" ]]; then
   echo "${DIM}[cc-baton] $(m "couldn't check the latest version (network); running the installed ${installed:-?}" "최신 버전을 확인하지 못해(네트워크) 설치된 ${installed:-?} 로 실행합니다")${R}" >&2

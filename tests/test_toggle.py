@@ -66,3 +66,20 @@ def test_update_cannot_be_turned_on_for_a_self_updating_claude(home):
     assert home.run("toggle", "is-on", "update").returncode == 1
     assert home.run("toggle", "autoswap", "off").returncode == 0  # HUD 용어로도 부른다
     assert home.run("toggle", "is-on", "swap").returncode == 1
+
+
+def test_update_check_uses_the_cached_latest_version(home):
+    prefix = home.root / "npm"
+    pkg = prefix / "lib/node_modules/@anthropic-ai/claude-code"
+    pkg.mkdir(parents=True)
+    (pkg / "package.json").write_text('{\n  "name": "@anthropic-ai/claude-code",\n  "version": "1.0.0"\n}\n')
+    (prefix / "bin").mkdir()
+    (prefix / "bin/claude").write_text("#!/bin/sh\n")
+    (prefix / "bin/claude").chmod(0o755)
+    home.fake("npm", "exit 1")
+    home.fake("node", "exit 1")  # 버전은 node 없이 읽는다
+    home.set_config(autoUpdate={"enabled": True})
+    home.state.mkdir(parents=True, exist_ok=True)
+    (home.state / "claude-latest").write_text("1.0.0\n")  # 30분 안에 확인한 최신 버전
+    assert home.run("claude-update", NPM_PREFIX=prefix).returncode == 0
+    assert not (home.root / "curl-called").exists()  # 레지스트리에 다시 묻지 않는다

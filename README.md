@@ -4,7 +4,7 @@
 
 # cc-baton
 
-**Move a Claude Code conversation between your own accounts. Keep every word of it.**
+**Move a Claude Code conversation between your own accounts, full transcript included.**
 
 [![CI](https://github.com/juunghyun/cc-baton/actions/workflows/ci.yml/badge.svg)](https://github.com/juunghyun/cc-baton/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8250DF?style=flat-square)](LICENSE)
@@ -25,7 +25,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh          # only if you don't hav
 uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton && ~/.local/bin/cc-baton install
 ```
 
-Open a new terminal and run **`baton`**. The first run asks a few questions (language, account groups, HUD, hibernation, auto-swap), then shows the account picker. You need at least one account in [claude-swap](https://github.com/realiti4/claude-swap), which comes bundled: log in to Claude Code and run `cswap add`.
+Open a new terminal and run **`baton`**. The first run asks a few questions (language, account groups, HUD, hibernation, auto-swap, usage refresh), then shows the account picker. You need at least one account in [claude-swap](https://github.com/realiti4/claude-swap), which comes bundled: log in to Claude Code and run `cswap add`.
 
 `cc-baton install` never asks anything and is safe to re-run. It backs up `~/.claude/settings.json` before touching it and never replaces a statusline you already have without asking.
 
@@ -46,9 +46,9 @@ Run exactly the two lines above (skip the first if `uv --version` works). Don't 
 
 **Hard to swap the wrong way.** Give accounts groups such as `work` and `personal`. Moving a conversation to another group asks you first.
 
-**Idle tabs stop eating memory.** Optional: a session left idle has its process stopped, and any key brings it back with the conversation intact. `/sleep` does it right away.
+**Idle tabs stop eating memory.** Optional: a session left idle has its Claude Code process stopped (force-stopped if it doesn't exit). Any key resumes the saved conversation; work that was still running when it stopped can be lost. `/sleep` does it right away.
 
-**Switch for you when an account runs out.** Optional and off by default. When one of your accounts hits its usage limit, cc-baton schedules a swap to another of your accounts, so pressing Ctrl+D is all it takes.
+**Ready when an account runs out.** Optional and off by default. When one of your accounts hits its usage limit, cc-baton can prepare a switch to another of your own accounts; you confirm it with Ctrl+D.
 
 ## Commands
 
@@ -72,9 +72,10 @@ Removes only what cc-baton added and puts back the statusline you had. Your clau
 ## Before you use it
 
 - **Your own accounts only.** Sharing an account or its login with anyone else is not allowed under Anthropic's [Consumer Terms](https://www.anthropic.com/legal/consumer-terms).
-- **Each account keeps its own limits.** cc-baton only changes which of your accounts Claude Code uses; it doesn't raise or reset any limit. Auto-swap is off by default. Read Anthropic's [Usage Policy](https://www.anthropic.com/legal/aup) and [Claude Code terms](https://code.claude.com/docs/en/legal-and-compliance) and decide for yourself before turning it on.
-- **Work accounts follow your company's rules.** Team and Enterprise seats are covered by your organization's agreement. Moving a work conversation to a personal account may be against its policy; the group check asks before doing it.
-- **Your login stays with Claude Code.** cc-baton runs the unmodified Claude Code and never reads or stores your credentials. Switching logins on your machine is done by claude-swap.
+- **Each account keeps its own limits.** cc-baton only changes which of your accounts Claude Code uses; it doesn't raise or reset any limit. Anthropic says Pro and Max limits assume ordinary, individual use and may enforce its terms without notice. Auto-swap is off by default; read the [Usage Policy](https://www.anthropic.com/legal/aup) and [Claude Code terms](https://code.claude.com/docs/en/legal-and-compliance) before turning it on.
+- **Work conversations belong to your organization.** Team and Enterprise seats are covered by your organization's agreement ([Commercial Terms](https://www.anthropic.com/legal/commercial-terms)), under which the organization owns its inputs and outputs. After a move to a personal account, the conversation is handled under the [Consumer Terms](https://www.anthropic.com/legal/consumer-terms), including use for model training unless you opt out. The group check asks before such a move.
+- **Logins are stored by claude-swap.** cc-baton itself never reads your tokens, but it installs claude-swap, which keeps a copy of each account's Claude login on this Mac and refreshes it. Anthropic's [Claude Code terms](https://code.claude.com/docs/en/legal-and-compliance) restrict third-party tools that store Claude.ai credentials; read them and decide whether this fits your accounts, especially work seats.
+- **Usage numbers are optional.** If you turn on usage refresh in setup, claude-swap asks Anthropic's usage endpoint for each of your accounts in the background. It's off by default.
 - cc-baton reads claude-swap's state files and parts of Claude Code that aren't official APIs. Tested with macOS 15.3, Claude Code 2.1.285 and claude-swap 0.25–0.26.
 
 ## More
@@ -87,4 +88,4 @@ Development: `uv tool install -e . && cc-baton install` from a clone, tests with
 
 I work across a team seat and a personal plan every day. Every time a task moved from one account to the other, the conversation stayed behind and I had to explain everything again. cc-baton is the smallest thing I could build that keeps the thread.
 
-cc-baton is an unofficial add-on, not affiliated with or endorsed by Anthropic or claude-swap. Claude and Claude Code are products of Anthropic. MIT licensed.
+cc-baton is an unofficial add-on, not affiliated with or endorsed by Anthropic or claude-swap. Claude and Claude Code are trademarks of Anthropic, PBC. MIT licensed; provided as is, without warranty.

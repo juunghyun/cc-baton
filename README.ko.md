@@ -4,7 +4,7 @@
 
 # cc-baton
 
-**내 Claude Code 계정끼리 대화를 옮겨도, 한 글자도 잃지 않습니다.**
+**내 Claude Code 계정끼리 대화를 옮깁니다. 트랜스크립트 전체 그대로.**
 
 [![CI](https://github.com/juunghyun/cc-baton/actions/workflows/ci.yml/badge.svg)](https://github.com/juunghyun/cc-baton/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-8250DF?style=flat-square)](LICENSE)
@@ -25,7 +25,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh          # uv 가 없을 때만
 uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton && ~/.local/bin/cc-baton install
 ```
 
-새 터미널을 열고 **`baton`** 을 실행하세요. 처음 실행하면 몇 가지(언어, 계정 그룹, HUD, 절전, 자동 스왑)를 묻고 계정 피커가 뜹니다. 함께 설치되는 [claude-swap](https://github.com/realiti4/claude-swap) 에 계정이 하나 이상 있어야 합니다. Claude Code 에 로그인한 상태에서 `cswap add` 를 실행하세요.
+새 터미널을 열고 **`baton`** 을 실행하세요. 처음 실행하면 몇 가지(언어, 계정 그룹, HUD, 절전, 자동 스왑, 사용량 갱신)를 묻고 계정 피커가 뜹니다. 함께 설치되는 [claude-swap](https://github.com/realiti4/claude-swap) 에 계정이 하나 이상 있어야 합니다. Claude Code 에 로그인한 상태에서 `cswap add` 를 실행하세요.
 
 `cc-baton install` 은 아무것도 묻지 않고, 여러 번 돌려도 결과가 같습니다. `~/.claude/settings.json` 은 먼저 백업하고, 이미 쓰는 statusline 은 묻지 않고 바꾸지 않습니다.
 
@@ -46,9 +46,9 @@ uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton && ~/.lo
 
 **엉뚱한 계정으로 넘기기 어렵습니다.** 계정에 `work`, `personal` 같은 그룹을 정해 두면, 그룹이 다른 계정으로 옮길 때 먼저 묻습니다.
 
-**쉬는 탭이 메모리를 먹지 않습니다.** 선택 기능입니다. 오래 쉬는 세션은 프로세스를 멈추고, 아무 키나 누르면 대화 그대로 돌아옵니다. `/sleep` 은 바로 재웁니다.
+**쉬는 탭이 메모리를 먹지 않습니다.** 선택 기능입니다. 오래 쉬는 세션은 Claude Code 프로세스를 멈춥니다(끝나지 않으면 강제 종료). 아무 키나 누르면 저장된 대화로 이어지고, 멈출 때 진행 중이던 작업은 잃을 수 있습니다. `/sleep` 은 바로 재웁니다.
 
-**계정 하나를 다 쓰면 알아서 넘겨 줍니다.** 선택 기능이고 기본은 꺼져 있습니다. 내 계정 하나가 사용 한도에 걸리면 다른 내 계정으로 스왑을 예약해 두어서, Ctrl+D 만 누르면 됩니다.
+**계정 하나를 다 쓰면 전환을 준비해 둡니다.** 선택 기능이고 기본은 꺼져 있습니다. 내 계정 하나가 사용 한도에 걸리면 다른 내 계정으로 전환을 준비하고, Ctrl+D 로 확정합니다.
 
 ## 명령
 
@@ -72,9 +72,10 @@ cc-baton 이 넣은 것만 걷어내고, 원래 쓰던 statusline 을 되돌립�
 ## 쓰기 전에
 
 - **본인 계정끼리만 쓰세요.** 계정이나 로그인 정보를 다른 사람과 나눠 쓰는 것은 Anthropic [소비자 약관](https://www.anthropic.com/legal/consumer-terms)에서 허용하지 않습니다.
-- **계정마다 한도는 그대로입니다.** cc-baton 은 Claude Code 가 내 계정 중 어느 것을 쓸지만 바꿀 뿐, 한도를 늘리거나 초기화하지 않습니다. 자동 스왑은 기본으로 꺼져 있습니다. 켜기 전에 Anthropic [사용 정책](https://www.anthropic.com/legal/aup)과 [Claude Code 약관](https://code.claude.com/docs/en/legal-and-compliance)을 읽고 직접 판단하세요.
-- **업무 계정은 회사 규칙을 따릅니다.** 팀·엔터프라이즈 시트는 소속 조직의 계약을 따릅니다. 업무 대화를 개인 계정으로 옮기는 게 회사 정책에 어긋날 수 있고, 그룹 확인이 그 전에 한 번 묻습니다.
-- **로그인은 Claude Code 에 맡깁니다.** cc-baton 은 수정하지 않은 Claude Code 를 실행할 뿐, 로그인 정보를 읽거나 저장하지 않습니다. 내 컴퓨터에서 로그인을 바꾸는 일은 claude-swap 이 합니다.
+- **계정마다 한도는 그대로입니다.** cc-baton 은 Claude Code 가 내 계정 중 어느 것을 쓸지만 바꿀 뿐, 한도를 늘리거나 초기화하지 않습니다. Anthropic 은 Pro·Max 한도가 평범한 개인 사용을 전제로 하며 약관을 사전 통지 없이 집행할 수 있다고 밝힙니다. 자동 스왑은 기본으로 꺼져 있으니, 켜기 전에 [사용 정책](https://www.anthropic.com/legal/aup)과 [Claude Code 약관](https://code.claude.com/docs/en/legal-and-compliance)을 읽어 보세요.
+- **업무 대화는 소속 조직의 것입니다.** 팀·엔터프라이즈 시트는 조직의 계약([상업 약관](https://www.anthropic.com/legal/commercial-terms))을 따르고, 입력과 출력은 조직 소유입니다. 개인 계정으로 옮긴 대화는 [소비자 약관](https://www.anthropic.com/legal/consumer-terms)을 따르며, 거부하지 않으면 모델 학습에 쓰일 수 있습니다. 그룹 확인이 옮기기 전에 한 번 묻습니다.
+- **로그인 정보는 claude-swap 이 저장합니다.** cc-baton 자체는 토큰을 읽지 않지만, 함께 설치되는 claude-swap 이 계정마다 Claude 로그인 사본을 이 Mac 에 보관하고 갱신합니다. Anthropic [Claude Code 약관](https://code.claude.com/docs/en/legal-and-compliance)은 Claude.ai 로그인 정보를 저장하는 외부 도구를 제한하니, 특히 업무 시트라면 읽어 보고 판단하세요.
+- **사용량 숫자는 선택입니다.** 설정에서 사용량 갱신을 켜면 claude-swap 이 계정마다 Anthropic 사용량 API 를 백그라운드로 조회합니다. 기본은 꺼져 있습니다.
 - claude-swap 의 상태 파일과 Claude Code 의 비공식 부분을 읽습니다. 확인한 환경: macOS 15.3, Claude Code 2.1.285, claude-swap 0.25–0.26.
 
 ## 더 보기
@@ -87,4 +88,4 @@ cc-baton 이 넣은 것만 걷어내고, 원래 쓰던 statusline 을 되돌립�
 
 팀 시트와 개인 요금제를 매일 오갑니다. 작업이 한 계정에서 다른 계정으로 옮겨 갈 때마다 대화는 원래 계정에 남아서, 처음부터 다시 설명해야 했습니다. cc-baton 은 그 흐름을 잇기 위해 만든 가장 작은 도구입니다.
 
-cc-baton 은 Anthropic·claude-swap 과 관계없고 그들이 보증하지 않는 비공식 도구입니다. Claude 와 Claude Code 는 Anthropic 의 제품입니다. MIT 라이선스.
+cc-baton 은 Anthropic·claude-swap 과 관계없고 그들이 보증하지 않는 비공식 도구입니다. Claude 와 Claude Code 는 Anthropic, PBC 의 상표입니다. MIT 라이선스이며 어떤 보증도 없이 제공됩니다.

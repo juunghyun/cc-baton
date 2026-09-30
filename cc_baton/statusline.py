@@ -70,7 +70,9 @@ def window(label, entry, show_reset=True):
 
 
 def maybe_refresh(age):
-    """캐시가 낡았고 최근에 갱신을 던진 적 없으면, detached 로 1회 던진다."""
+    """캐시가 낡았고 최근에 갱신을 던진 적 없으면, detached 로 1회 던진다 (usageRefresh 를 켰을 때만)."""
+    if not st.feature("usageRefresh")["enabled"]:
+        return
     if age is not None and age < REFRESH_AFTER:
         return
     if not any(st.poll_due(a["num"]) for a in st.accounts()):

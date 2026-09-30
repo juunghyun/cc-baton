@@ -72,7 +72,7 @@ def cols(fd):
 
 
 def refresh_if_stale(accs):
-    if os.environ.get("CC_PICK_NO_REFRESH"):
+    if os.environ.get("CC_PICK_NO_REFRESH") or not st.feature("usageRefresh")["enabled"]:
         return
     ages = [(st.usage(a["num"]) or {}).get("_age") for a in accs]
     fresh = [x for x in ages if x is not None]

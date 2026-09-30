@@ -1,5 +1,5 @@
 # README GIF 2: 실제 Claude Code 에서 계정 스왑 후 맥락 유지. 실제 계정 두 개가 필요하다.
-# 녹화 전: 회사 계정 별칭을 잠깐 work 로 (env -u CLAUDE_CONFIG_DIR cc-baton cswap alias <n> work), 녹화 뒤 원래대로.
+# 녹화 전: 한쪽 계정 별칭을 잠깐 work 로 (env -u CLAUDE_CONFIG_DIR cc-baton cswap alias <n> work), 녹화 뒤 원래대로.
 # 이메일이 찍히는 claude-swap 실행 줄은 Hide 구간(시작, Ctrl+D 두 번 뒤 재실행)에만 나온다. 녹화 후 프레임을 반드시 확인.
 # 실행: env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh TERM=xterm-256color LANG=en_US.UTF-8 PATH="$PATH" vhs docs/demo/swap.tape
 Output "docs/demo-swap.gif"

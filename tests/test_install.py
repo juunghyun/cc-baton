@@ -152,7 +152,7 @@ def test_setup_wizard_in_terminal(home, inst):
                     return
 
     # 그룹: personal → side, team → 엔터(그대로) / 절전: 켜고 45분 / 자동 스왑: 끔
-    for answer in (b"ko\r", b"side\r", b"\r", b"y\r", b"45\r", b"n\r"):
+    for answer in (b"ko\r", b"side\r", b"\r", b"y\r", b"45\r", b"n\r", b"n\r"):
         pump(0.6)
         try:
             os.write(fd, answer)
@@ -166,6 +166,7 @@ def test_setup_wizard_in_terminal(home, inst):
     assert cfg["1"]["group"] == "side" and cfg["2"]["group"] == "team"
     assert cfg["hibernate"] == {"enabled": True, "idleMin": 45.0}
     assert cfg["onLimit"]["enabled"] is False and cfg["setup"]["done"] is True and cfg["language"] == "ko"
+    assert cfg["usageRefresh"] == {"enabled": False}
     import plistlib
     plist = plistlib.loads((home.root / "Library/LaunchAgents/io.github.juunghyun.cc-baton.hib.plist").read_bytes())
     assert plist["ProgramArguments"] == [EXE, "hib", "tick"]

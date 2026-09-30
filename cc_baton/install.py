@@ -32,6 +32,7 @@ LAUNCH_AGENTS = Path.home() / "Library" / "LaunchAgents"
 HIB_PLIST = LAUNCH_AGENTS / f"{st.HIB_LABEL}.plist"
 HIB_LOG = st.STATE_DIR / "hib.log"
 ZSH_BEGIN, ZSH_END = "# >>> cc-baton >>>", "# <<< cc-baton <<<"
+CCLEGAL_URL = "https://code.claude.com/docs/en/legal-and-compliance"
 CMD_MARK = "<!-- installed by cc-baton; `cc-baton uninstall` removes this file -->"
 
 
@@ -486,20 +487,30 @@ def cmd_setup(argv):
             w("  → " + L("off (/sleep still works any time)", "껐습니다 (/sleep 으로 직접 재우기는 됩니다)"))
 
         # 4) 한도 자동 스왑
-        w("\n" + BOLD + L("4. Auto-swap on rate limits", "4. 한도 도달 시 자동 스왑") + R + " " + DIM
-          + L("— when you hit the 5h or weekly limit, schedules a swap to an account with room left",
-              "— 5h·주간 한도에 걸리면 여유 있는 계정으로 스왑을 예약합니다") + R)
-        w(f"  {YEL}" + L("Check for yourself whether using several accounts around usage limits fits Anthropic's terms.",
-                         "여러 계정으로 사용 한도를 넘나드는 게 Anthropic 약관에 맞는지는 직접 확인하세요.") + R)
+        w("\n" + BOLD + L("4. Auto-swap", "4. 자동 스왑") + R + " " + DIM
+          + L("— when one of your accounts hits its usage limit, prepare a switch to another of your own accounts (you confirm with Ctrl+D)",
+              "— 내 계정 하나가 사용 한도에 걸리면 다른 내 계정으로 전환을 준비합니다 (Ctrl+D 로 확정)") + R)
+        w(f"  {YEL}" + L("Anthropic says Pro/Max limits assume ordinary, individual use and may enforce its terms without notice.",
+                         "Anthropic 은 Pro·Max 한도가 평범한 개인 사용을 전제로 하며, 약관을 사전 통지 없이 집행할 수 있다고 밝힙니다.")
+          + f"\n  {CCLEGAL_URL}" + R)
         lim = st.feature("onLimit")
         on = t.yes("  " + L("Turn it on?", "켤까요?"), lim["enabled"])
         cfg = st.config()
         save_config(onLimit={**(cfg.get("onLimit") or {}), "enabled": on})
         w("  → " + (L("on", "켰습니다") if on else L("off (/swap still works any time)", "껐습니다 (/swap 으로 직접 바꾸기는 됩니다)")))
 
-        # 5) 따로 깔린 claude-swap
+        # 5) 사용량 숫자 갱신 (claude-swap 이 계정마다 사용량 API 를 부른다)
+        w("\n" + BOLD + L("5. Usage numbers", "5. 사용량 숫자") + R + " " + DIM
+          + L("— keep each account's usage fresh in the HUD and picker", "— HUD 와 피커의 계정별 사용량을 최신으로") + R)
+        w("  " + L("claude-swap will ask Anthropic's usage endpoint for each of your accounts in the background.",
+                   "claude-swap 이 계정마다 Anthropic 사용량 API 를 백그라운드로 조회합니다."))
+        on = t.yes("  " + L("Turn it on?", "켤까요?"), st.feature("usageRefresh")["enabled"])
+        save_config(usageRefresh={"enabled": on})
+        w("  → " + (L("on", "켰습니다") if on else L("off (numbers update when you run `cswap list`)", "껐습니다 (`cswap list` 를 실행하면 갱신됩니다)")))
+
+        # 6) 따로 깔린 claude-swap
         if _separate_claude_swap():
-            w("\n" + BOLD + "5. claude-swap" + R + " " + DIM
+            w("\n" + BOLD + "6. claude-swap" + R + " " + DIM
               + L("— you have claude-swap installed separately. Your account data stays as it is",
                   "— 따로 설치된 claude-swap 이 있습니다. 계정 데이터는 그대로 씁니다") + R)
             if t.yes("  " + L("Remove it and use the version bundled with cc-baton?", "정리하고 cc-baton 에 들어 있는 버전을 쓸까요?"), True):

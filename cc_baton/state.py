@@ -271,6 +271,8 @@ FEATURE_DEFAULTS = {
     "autoUpdate": {"enabled": False},
     "hibernate": {"enabled": False, "idleMin": 90},
     "onLimit": {"enabled": False, "approveCrossing": False, "minHeadroomPct": 15},
+    # claude-swap 이 계정마다 Anthropic 사용량 API 를 부른다. 스크립트가 도는 접근이라 사용자가 켤 때만.
+    "usageRefresh": {"enabled": False},
 }
 UPDATE_FAILED = STATE_DIR / "update-failed"  # claude-update 가 설치 실패 시 남긴다
 HIB_LABEL = "io.github.juunghyun.cc-baton.hib"  # hib tick 을 돌리는 launchd 에이전트

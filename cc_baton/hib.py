@@ -43,7 +43,7 @@ if sys.stdout.isatty() or sys.stderr.isatty():
                                "\033[38;5;39m", "\033[38;5;170m")
 else:
     R = DIM = BOLD = RED = YEL = GRN = CYA = MAG = ""
-STATE = Path.home() / ".local/state/cc-hib"
+STATE = st.STATE_DIR / "hib"
 REQ, PARKED, PENDING = STATE / "req", STATE / "parked", STATE / "pending"
 CAP = STATE / "cap"          # 재우기를 받을 줄 아는 래퍼가 붙은 tty
 IDLE_MIN_PRESSURE = 30.0         # 메모리 압박 시 임계

@@ -40,7 +40,7 @@ class Home:
         self.root = root
         self.backup = root / ".claude-swap-backup"
         self.fakebin = root / "fakebin"
-        self.state = root / ".local/state/cc-swap"
+        self.state = root / ".local/state/cc-baton"
         self.config = root / ".config/cc-baton/config.json"
 
     # --- 상태 조작 ---
@@ -115,7 +115,8 @@ class Home:
 
     def run(self, sub, *args, input=None, **env):
         return subprocess.run([sys.executable, "-m", "cc_baton", sub, *args], input=input,
-                              capture_output=True, text=True, env=self.env(**env), cwd=self.root, timeout=20)
+                              capture_output=True, text=True, env=self.env(**env), cwd=self.root, timeout=20,
+                              start_new_session=True)  # /dev/tty 없음 = 에이전트·CI 처럼
 
 
 @pytest.fixture
@@ -152,4 +153,5 @@ def home(tmp_path):
     h.fakebin.mkdir()
     h.fake("launchctl", 'exit "${FAKE_LAUNCHCTL_RC:-0}"')
     h.fake("curl", f'touch "{tmp_path}/curl-called"; exit 1')
+    h.fake("uv", f'echo "$@" >> "{tmp_path}/uv-calls"')
     return h

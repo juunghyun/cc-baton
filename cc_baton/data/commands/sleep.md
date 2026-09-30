@@ -1,10 +1,10 @@
 ---
 description: 이 세션을 지금 재운다 — 대화는 그대로 두고 메모리만 회수한다 (cc-baton hib)
 argument-hint: [pid|이름] [--all] [--force] [--dry]
-allowed-tools: Bash(cc-baton hib:*)
+allowed-tools: Bash({cc_baton} hib:*)
 ---
 
-`cc-baton hib sleep $ARGUMENTS` 를 실행하고 출력을 그대로 사용자에게 전달해라.
+`{cc_baton} hib sleep $ARGUMENTS` 를 실행하고 출력을 그대로 사용자에게 전달해라.
 
 인자가 없으면 **지금 이 세션**이 대상이다. 유예도 알림도 없이 즉시 종료된다 — 사용자가 명시적으로 시킨 것이기 때문이다.
 

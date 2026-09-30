@@ -16,15 +16,16 @@
 # 끄기: cc-baton toggle update off (한 번만: CC_NO_UPDATE=1)
 
 PKG="@anthropic-ai/claude-code"
-NPM_PREFIX="${NPM_PREFIX:-$HOME/.npm-global}"
+NPM_PREFIX="${NPM_PREFIX:-$(npm prefix -g 2>/dev/null)}"
 PKG_JSON="$NPM_PREFIX/lib/node_modules/$PKG/package.json"
 BIN="$NPM_PREFIX/bin/claude"
-LOCK="$HOME/.local/state/cc-update.lock"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/cc-baton"
+LOCK="$STATE/claude-update.lock"
 R=$'\033[0m'; DIM=$'\033[2m'; BOLD=$'\033[1m'; GRN=$'\033[38;5;42m'; YEL=$'\033[38;5;208m'
 
 [[ -n "$CC_NO_UPDATE" ]] && exit 0
 "${CC_BATON_PY:-python3}" -m cc_baton toggle is-on update || exit 0   # cc-baton toggle update off
-FAILED="${XDG_STATE_HOME:-$HOME/.local/state}/cc-swap/update-failed"   # HUD 3행이 ⚠실패 로 띄운다
+FAILED="$STATE/update-failed"   # HUD 3행이 ⚠실패 로 띄운다
 
 installed_version() {
   [[ -f "$PKG_JSON" ]] || return 0

@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import time
 import unicodedata
 from datetime import datetime, timezone
@@ -18,8 +19,13 @@ SEQ_PATH = BACKUP / "sequence.json"
 MAP_PATH = BACKUP / "mappings.json"
 USAGE_PATH = BACKUP / "cache" / "usage.json"
 SESSIONS_DIR = BACKUP / "sessions"
-CSWAP_BIN = Path.home() / ".local" / "bin" / "cswap"
-STATE_DIR = Path(os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state")) / "cc-swap"
+# cc-baton 과 함께 설치된 claude-swap 을 쓴다 (테스트한 버전으로 고정). 없으면 따로 깔린 것.
+_BUNDLED_CSWAP = Path(sys.executable).parent / "cswap"
+CSWAP_BIN = _BUNDLED_CSWAP if _BUNDLED_CSWAP.exists() else Path.home() / ".local" / "bin" / "cswap"
+_STATE_ROOT = Path(os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state"))
+STATE_DIR = _STATE_ROOT / "cc-baton"
+# 0.1 이전 상태 폴더 → 새 위치. install 이 옮기고 옛 경로에 링크를 남긴다 (옛 셸 함수를 든 탭용).
+LEGACY_STATE = {_STATE_ROOT / "cc-swap": STATE_DIR, _STATE_ROOT / "cc-hib": STATE_DIR / "hib"}
 MARKER = STATE_DIR / "request.json"
 REFRESH_STAMP = STATE_DIR / "usage-refresh.stamp"
 
@@ -259,11 +265,12 @@ def crosses_boundary(src_num, dst_num):
 
 # --- 기능 스위치 (cc-toggle 로 켜고 끄고, HUD 3행이 보여준다) : 같은 파일의 최상위 키 ---
 FEATURE_DEFAULTS = {
-    "autoUpdate": {"enabled": True},
-    "hibernate": {"enabled": True, "idleMin": 90},
-    "onLimit": {"enabled": True, "approveCrossing": False, "minHeadroomPct": 15},
+    # 설치 직후엔 전부 꺼져 있고, 위저드(cc-baton setup)가 켠다. autoUpdate 는 install 이 npm 설치본이면 켠다.
+    "autoUpdate": {"enabled": False},
+    "hibernate": {"enabled": False, "idleMin": 90},
+    "onLimit": {"enabled": False, "approveCrossing": False, "minHeadroomPct": 15},
 }
-UPDATE_FAILED = STATE_DIR / "update-failed"  # cc-update 가 설치 실패 시 남긴다
+UPDATE_FAILED = STATE_DIR / "update-failed"  # claude-update 가 설치 실패 시 남긴다
 HIB_LABEL = "io.github.juunghyun.cc-baton.hib"  # hib tick 을 돌리는 launchd 에이전트
 
 

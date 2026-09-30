@@ -62,11 +62,50 @@
 - 경계 교차 = 그룹이 다른 계정으로의 이동
 - HUD 2행 다른 계정: 최근 사용순 2개 + "외 k개". 최근 사용 = `<프로필>/sessions/*.json`·`history.jsonl` 수정 시각 중 최신 (stat 만). 기록 없는 계정은 등록 순서로 뒤에
 
-### 5. 설치·제거 명령 (M)
+### 5. 설치·제거 (M) — 인터뷰로 확정 (2026-09-30)
 
-- `install`: settings.json 에 훅·statusline 병합 (병합 전 백업), `/swap`·`/sleep` 명령, launchd plist, zsh 설정 한 줄
-- `uninstall`: 넣은 것만 정확히 되돌린다
-- 완료 기준: 작성자 환경의 심볼릭 링크를 걷고 설치 명령만으로 같은 동작. 새 macOS 사용자 계정에서 처음부터 설치
+사용자 시나리오: 에이전트에게 레포 주소를 주고 "설치해줘" 하는 경우가 많다. 그래서 설치는 질문 없이 끝나고,
+선택이 필요한 설정은 사용자가 처음 `baton` 을 실행할 때 위저드로 받는다 (소프트랜딩).
+근거: 비슷한 도구 16개 조사 (ccstatusline, claude-hud, gstack, claude-mem, gsd-core, SuperClaude, aider 등).
+
+**설치 (README)** — uv 두 줄
+```
+curl -LsSf https://astral.sh/uv/install.sh | sh          # uv 가 없을 때만
+uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton && cc-baton install
+```
+- `--python 3.12`: uv 가 Python 까지 받아서 사용자는 Python 버전을 신경 쓰지 않는다
+- uv 를 방금 깔아 `~/.local/bin` 이 아직 PATH 에 없는 셸도 `cc-baton install` 이 돌게 한다 (절대경로 또는 `uv tool update-shell`)
+- README 에 "For AI agents" 섹션: 실행할 명령 그대로 + "settings.json·zshrc 를 직접 고치지 말고, 끝나면 사용자에게 새 터미널에서 `baton` 을 실행하라고 전해라"
+
+**`cc-baton install` (질문 없음, 여러 번 돌려도 같은 결과)** — 안전한 것만
+- `/swap`·`/sleep` 명령 파일을 `~/.claude/commands/` 에 (cc-baton 표시 포함)
+- `~/.zshrc` 에 `# >>> cc-baton >>>` 표시 블록 한 번 (`baton` 함수)
+- settings.json: 쓰기 전 시각별 백업, 깨진 JSON 이면 멈춤. 훅은 표시를 달아 추가만(중복 없음).
+  statusline 은 비어 있을 때만 넣고, 있으면 원래 값을 기록해 두고 위저드로 넘김
+- launchd 는 등록하지 않는다 (위저드에서만)
+- 바꾼 것을 전부 출력. 옛 상태 폴더(`~/.local/state/cc-swap`, `cc-hib`)·hib 로그 이관도 여기서
+
+**첫 실행 위저드 (`baton` 을 처음 실행할 때, `cc-baton setup` 으로 다시 실행)** — 끝나면 바로 계정 피커
+- HUD: 기존 statusline 이 있으면 미리보기를 보여주고 교체/유지
+- 계정 그룹: claude-swap 에 등록된 계정마다 그룹 이름(엔터 = 건너뛰기). 계정이 1개면 추가 방법 안내
+- 절전: 켜기/끄기 + 유휴 기준. 켜면 launchd 등록
+- 한도 도달 시 자동 스왑: 기본 꺼짐. 켜려면 약관 주의 문구 확인
+- 따로 설치된 claude-swap 이 있으면 정리 제안 (계정 데이터는 그대로 씀)
+- 자동 업데이트는 묻지 않는다: npm 으로 깐 Claude Code 면 켜짐, 공식 설치본이면 꺼짐(자체 자동 업데이트가 있음)
+
+**claude-swap**: cc-baton 이 함께 설치하고 `cswap` 도 노출(`--with-executables-from claude-swap`).
+cc-baton 은 자기와 같이 설치된 버전만 부른다.
+
+**명령 이름**: Claude Code 업데이트는 `cc-baton claude-update`(래퍼 내부용), `cc-baton upgrade` 는 cc-baton 자신을
+최신으로 올리고 `install` 을 다시 돌린다. 토글 이름 `update` 는 그대로.
+
+**`cc-baton uninstall` (명령 하나)**
+- 표시 단 훅·명령 파일·zshrc 블록·launchd 만 정확히 걷고, 설치 때 기록해 둔 원래 statusline 을 되돌린다
+- 설정·기록(그룹 설정, 상태, 로그): 지울지 묻고 기본은 남김. `--purge` 면 전부
+- claude-swap(`cswap`): 따로 남길지 묻는다. 계정 로그인 데이터(`~/.claude-swap-backup`)는 어떤 경우에도 지우지 않는다
+- 마지막에 패키지 자체 삭제를 묻는다
+
+**완료 기준**: 작성자 환경의 수동 연결을 걷고 `install` + 위저드만으로 같은 동작. 새 macOS 사용자 계정에서 처음부터 설치·제거.
 
 ### 6. 동작 보강 (S)
 

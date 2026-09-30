@@ -185,6 +185,8 @@ def effort_bit(level):
             "max": f"{BOLD}\033[38;5;231mMAX"}[level] + R
     stripe = {"low": "\033[38;5;240m", "medium": "\033[38;5;67m", "high": "\033[38;5;33m",
               "xhigh": tc((255, 135, 0)), "max": tc(hue(shift))}[level]
+    if st.config().get("levelChip") is not True:  # 레벨 칩은 설정에서 켠 사람에게만 (문서에 없는 개인 취향 옵션)
+        return f"{meter} {name}"
     chip = "\033[3;38;5;245;48;5;235m" if level == "low" else "\033[1;3;38;5;231;48;5;237m"
     return f"{meter} {name} {stripe}▌{R}{chip} Lv.{EFFORT_LV[level]} {R}"
 

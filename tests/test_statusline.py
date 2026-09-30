@@ -27,7 +27,9 @@ def render(home, effort=None, columns=140, **env):
 def test_effort_meter_and_level_chip(home, level, cells, lv):
     line1 = plain(render(home, level)[0])
     assert "Opus 5.5[1M] " + "▰" * cells + "▱" * (5 - cells) in line1
-    assert f"▌ {lv} " in line1
+    assert "Lv." not in line1  # 레벨 칩은 기본으로 없다
+    home.set_config(levelChip=True)
+    assert f"▌ {lv} " in plain(render(home, level)[0])
 
 
 def test_unknown_or_missing_effort(home):

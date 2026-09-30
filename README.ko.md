@@ -22,7 +22,7 @@
 
 ```sh
 command -v uv >/dev/null || { curl -LsSf https://astral.sh/uv/install.sh | sh && . "$HOME/.local/bin/env"; }
-uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton@v0.1.1 && ~/.local/bin/cc-baton install
+uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton@v0.1.2 && ~/.local/bin/cc-baton install
 ```
 
 새 터미널을 열고 **`baton`** 을 실행하세요(zsh 함수이며, macOS 기본 셸이 zsh 입니다). 앞으로 Claude Code 는 `claude` 대신 `baton` 으로 여세요. 처음 실행하면 몇 가지(언어, 계정 그룹과 짧은 이름, HUD, 절전, 자동 스왑, 사용량 갱신, 권한 확인)를 묻고 계정 피커가 뜹니다. 계정은 함께 설치되는 [claude-swap](https://github.com/realiti4/claude-swap) 에 등록합니다. Claude Code 에 로그인한 상태에서 계정마다 `cswap add` 를 실행하세요. 계정이 하나여도 HUD 와 절전은 쓸 수 있습니다.

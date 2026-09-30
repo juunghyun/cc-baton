@@ -338,6 +338,14 @@ def _preview_hud():
     return "\n".join("    " + line for line in r.stdout.rstrip().split("\n"))
 
 
+def _bundled_version():
+    try:
+        from importlib.metadata import version
+        return version("claude-swap")
+    except Exception:
+        return ""
+
+
 def _separate_claude_swap():
     try:
         out = subprocess.run(["uv", "tool", "list"], capture_output=True, text=True, timeout=10).stdout
@@ -431,7 +439,11 @@ def cmd_setup(argv):
             w(f"\n{BOLD}5. claude-swap{R} {DIM}— 따로 설치된 claude-swap 이 있습니다. 계정 데이터는 그대로 씁니다{R}")
             if t.yes("  정리하고 cc-baton 에 들어 있는 버전을 쓸까요?", True):
                 ok = subprocess.run(["uv", "tool", "uninstall", "claude-swap"], capture_output=True).returncode == 0
-                w(f"  → {link_cswap() if ok else '정리하지 못했습니다 (uv tool uninstall claude-swap)'}")
+                if ok:
+                    link_cswap()
+                    w(f"  → 정리했습니다. cswap 은 이제 cc-baton 에 들어 있는 claude-swap {_bundled_version()} 입니다")
+                else:
+                    w("  → 정리하지 못했습니다. 직접: uv tool uninstall claude-swap")
 
         cfg = st.config()
         cfg["setup"] = {"done": True, "at": time.time()}

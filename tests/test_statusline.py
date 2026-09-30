@@ -108,3 +108,23 @@ def test_other_accounts_most_recently_used_first(home):
     home.touch_session(home.add_account("3", "gamma", 10), now - 7200)
     home.touch_session(home.add_account("4", "delta", 10), now - 60)  # 방금 씀
     assert others_segment(home) == "↔ delta 10%/9%, team 40%/9% 외 1개"
+
+
+def test_missing_usage_values_do_not_break_hud(home):
+    path = home.backup / "cache/usage.json"
+    data = json.loads(path.read_text())
+    data["accounts"]["1"]["lastGood"]["five_hour"]["pct"] = None  # 지금 계정 5h 값 없음
+    data["accounts"]["2"]["lastGood"]["five_hour"].pop("pct")      # 다른 계정 5h 값 없음
+    path.write_text(json.dumps(data))
+    lines = render(home, "high")
+    assert "[statusline]" not in lines[0]  # 오류 한 줄로 떨어지지 않는다
+    row2 = plain(lines[1])
+    assert "5h —" in row2 and "team —/9%" in row2
+
+
+def test_hibernate_shows_threshold_actually_used(home):
+    (home.state / "hib").mkdir(parents=True)
+    (home.state / "hib/threshold.json").write_text(json.dumps({"idleMin": 30, "why": "memory", "at": time.time()}))
+    assert "30m 메모리부족" in plain(render(home, "high")[-1])
+    (home.state / "hib/threshold.json").write_text(json.dumps({"idleMin": 30, "at": time.time() - 3600}))
+    assert "90m" in plain(render(home, "high")[-1])  # 오래된 기록이면 설정값

@@ -52,8 +52,12 @@ def gauge(pct, width=6):
     return f"{c}{'█' * filled}{DIM}{'░' * (width - filled)}{R}"
 
 
+def pct_txt(pct):
+    return "—" if pct is None else f"{pct:.0f}%"
+
+
 def window(label, entry, show_reset=True):
-    if not entry:
+    if not entry or entry.get("pct") is None:
         return f"{DIM}{label} —{R}"
     pct = entry.get("pct")
     out = f"{DIM}{label}{R} {gauge(pct)} {pct_color(pct)}{pct:.0f}%{R}"
@@ -211,13 +215,24 @@ def swap_target_exists(num, min_headroom):
     return False
 
 
+def hib_idle_text(cfg_min):
+    """설정값 대신 hib tick 이 실제로 쓴 기준. 메모리가 부족하면 tick 이 기준을 낮춘다."""
+    try:
+        d = json.loads((st.STATE_DIR / "hib" / "threshold.json").read_text())
+        if time.time() - d["at"] < 600 and d["idleMin"] < cfg_min:
+            return f"{d['idleMin']:g}m 메모리부족"
+    except Exception:
+        pass
+    return f"{cfg_min:g}m"
+
+
 def settings_parts(num):
     up, hib, lim = st.feature("autoUpdate"), st.feature("hibernate"), st.feature("onLimit")
     state = lambda on, bad: "off" if not on else ("warn" if bad() else "on")  # noqa: E731
     return [
         setting("⟳", "업데이트", state(up["enabled"], st.UPDATE_FAILED.exists), warn="실패"),
         setting("⏾", "절전", state(hib["enabled"], lambda: not hib_loaded()),
-                val=f"{hib['idleMin']:g}m", warn="미등록"),
+                val=hib_idle_text(hib["idleMin"]), warn="미등록"),
         setting("⇄", "한도스왑",
                 state(lim["enabled"], lambda: not swap_target_exists(num, lim["minHeadroomPct"])),
                 val="교차허용" if lim["approveCrossing"] else "승인필요", warn="대상없음"),
@@ -324,7 +339,7 @@ def main():
         if f5 is None and f7 is None:
             continue
         used = st.last_used(a["num"])
-        text = f"{st.color(a['num'])}{a['label']}{R} {pct_color(f5)}{f5:.0f}%{R}/{pct_color(f7)}{f7:.0f}%{R}"
+        text = f"{st.color(a['num'])}{a['label']}{R} {pct_color(f5)}{pct_txt(f5)}{R}/{pct_color(f7)}{pct_txt(f7)}{R}"
         others.append(((used is None, -(used or 0), i), text))
     others = [t for _, t in sorted(others)]
     if others:

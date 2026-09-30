@@ -75,12 +75,18 @@ def find_transcript(profile, sid):
 
 
 def do_copy(src, dst_profile):
-    """트랜스크립트 1개를 대상 프로필의 같은 슬러그 아래로 복사한다."""
+    """트랜스크립트 1개를 대상 프로필의 같은 슬러그 아래로 복사한다.
+
+    옆의 <sid>/ 폴더(떼어 저장한 큰 도구 출력, 서브에이전트 기록)도 같이 옮겨야 대화가 온전하다.
+    """
     slug = src.parent.name
     dst_dir = Path(dst_profile) / "projects" / slug
     dst_dir.mkdir(parents=True, exist_ok=True)
     dst = dst_dir / src.name
     shutil.copy2(src, dst)
+    side = src.with_suffix("")
+    if side.is_dir():
+        shutil.copytree(side, dst_dir / side.name, dirs_exist_ok=True)
     return dst
 
 

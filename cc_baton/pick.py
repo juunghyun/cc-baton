@@ -90,6 +90,10 @@ def refresh_if_stale(accs):
     print("\r\033[K", end="", file=E, flush=True)
 
 
+def short(text, n):
+    return text if len(text) <= n else text[:n - 1] + "…"
+
+
 def row(a, selected, is_default):
     """계정 한 줄. selected=커서 위치, is_default=cwd 매핑 기본값."""
     g = st.usage(a["num"]) or {}
@@ -104,7 +108,7 @@ def row(a, selected, is_default):
     cursor = f"{BOLD}❯{R}" if selected else " "
     mark = f"{DIM}·{R}" if is_default and not selected else " "
     name = f"{REV}{kc}{a['label']:<12}{R}" if selected else f"{kc}{a['label']:<12}{R}"
-    return (f" {cursor}{mark}{a['num']}) {name} {kc}{st.group(a['num']):<9}{R}"
+    return (f" {cursor}{mark}{a['num']}) {name} {kc}{short(st.group(a['num']), 9):<9}{R}"
             f"{cell(g.get('five_hour'))} {cell(g.get('seven_day'))} {cell(fable, 6)}  {note}")
 
 
@@ -135,8 +139,22 @@ def interactive_select(accs, default_idx, tty_fd):
     """raw 모드 커서 피커. 선택된 인덱스 or None(취소)."""
     idx = default_idx
     n = len(accs)
-    for i, a in enumerate(accs):
-        print(clip(row(a, i == idx, i == default_idx), cols(tty_fd)), file=E)
+    drawn = []  # 마지막으로 그린 줄들의 표시 폭
+
+    def draw():
+        c = cols(tty_fd)
+        if drawn:
+            # 그 사이 창이 줄었으면 터미널이 예전 줄을 접어 두었다. 접힌 만큼 더 올라가고 아래를 비운다.
+            up = sum(max(1, -(-w // c)) for w in drawn)
+            E.write(f"\033[{up}A\r\033[J")
+        drawn.clear()
+        for i, a in enumerate(accs):
+            line = clip(row(a, i == idx, i == default_idx), c)
+            E.write(line + "\r\n")  # raw 모드에선 \n 만으로는 줄 맨 앞으로 안 돌아간다
+            drawn.append(sum(cw(ch) for ch in ANSI.sub("", line)))
+        E.flush()
+
+    draw()
     print(HIDE, end="", file=E, flush=True)
 
     old = termios.tcgetattr(tty_fd)
@@ -159,10 +177,7 @@ def interactive_select(accs, default_idx, tty_fd):
                 continue
             else:
                 continue
-            print(f"\033[{n}A", end="", file=E)
-            for i, a in enumerate(accs):
-                print("\r\033[K" + clip(row(a, i == idx, i == default_idx), cols(tty_fd)), file=E)
-            E.flush()
+            draw()
     finally:
         termios.tcsetattr(tty_fd, termios.TCSADRAIN, old)
         print(SHOW, end="", file=E, flush=True)

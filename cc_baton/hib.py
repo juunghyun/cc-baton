@@ -414,6 +414,7 @@ def cmd_tick(argv):
     if not st.feature("hibernate")["enabled"]:
         return 0  # cc-baton toggle hib off — 자동 재우기만 멈춘다 (/sleep 수동 재우기는 그대로)
     th, why = idle_threshold()
+    (STATE / "threshold.json").write_text(json.dumps({"idleMin": th, "why": why, "at": time.time()}))  # HUD 가 읽는다
     rows, lp, now = sessions()
     by_tty = {r["tty"]: r for r in rows}
     acted = []

@@ -92,3 +92,17 @@ def test_crossing_is_any_group_change(home):
     assert home.run("swap", "request", "2", "--sid", SID, CC_SWAP_LOOP=1).returncode == 0
     home.set_config(**{"2": {"group": "client-a"}})
     assert home.run("swap", "request", "2", "--sid", SID, CC_SWAP_LOOP=1).returncode == 2
+
+
+def test_handoff_copies_session_side_folder(home):
+    src = home.transcript(".claude", SID, body=BODY)
+    side = src.with_suffix("")
+    (side / "tool-results").mkdir(parents=True)
+    (side / "tool-results/big.txt").write_text("large tool output")
+    (side / "subagents").mkdir()
+    (side / "subagents/agent-1.jsonl").write_text("{}\n")
+    r = home.run("swap", "handoff", "2", "--sid", SID, "--src-profile", str(home.root / ".claude"))
+    assert r.returncode == 0, r.stderr
+    dst = home.root / TEAM_PROFILE / "projects/-tmp-proj" / SID
+    assert (dst / "tool-results/big.txt").read_text() == "large tool output"
+    assert (dst / "subagents/agent-1.jsonl").exists()

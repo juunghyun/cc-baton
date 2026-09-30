@@ -6,6 +6,10 @@ macOS 전용 · [English README](README.md) · [claude-swap](https://github.com/
 
 > 정식 출시 전입니다. 의견은 Issues 에 남겨 주세요.
 
+![cc-baton: 계정 피커, effort 단계별 HUD, 그룹이 다른 계정으로의 /swap](docs/demo.ko.gif)
+
+<sub>가짜 계정을 넣은 데모 환경에서 녹화했습니다([docs/demo](docs/demo)). Claude Code 안에서는 HUD 가 입력창 아래에 붙습니다.</sub>
+
 ```
 ● work [WORK] · Opus 5.5[1M] ▰▰▰▱▱ high ▌ Lv.60  · ctx 12% · ~/src/app (ft/login-302*)
 5h ██░░░░ 31% 2h04m │ 1w █░░░░░ 11% 3d11h │ ↔ personal 0%/3%, side 12%/40% 외 1개

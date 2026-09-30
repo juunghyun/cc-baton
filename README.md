@@ -6,6 +6,10 @@ macOS only · [한국어 README](README.ko.md) · Built on [claude-swap](https:/
 
 > Pre-release. Feedback welcome in Issues.
 
+![cc-baton: account picker, HUD with effort levels, and a /swap across groups](docs/demo.gif)
+
+<sub>Recorded with fake accounts in a demo environment ([docs/demo](docs/demo)). Inside Claude Code the HUD sits under the prompt.</sub>
+
 ```
 ● work [WORK] · Opus 5.5[1M] ▰▰▰▱▱ high ▌ Lv.60  · ctx 12% · ~/src/app (ft/login-302*)
 5h ██░░░░ 31% 2h04m │ 1w █░░░░░ 11% 3d11h │ ↔ personal 0%/3%, side 12%/40% +1 more

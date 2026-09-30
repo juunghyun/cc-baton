@@ -7,6 +7,7 @@ TTY가 없으면(파이프·CI) 한 줄 입력 방식으로 자동 폴백한다.
 기본값은 cwd 매핑(cswap map) → 없으면 기본 로그인 계정. 잔량이 낡았으면 한 번만 동기 갱신한다 —
 "어느 계정이 여유 있나"를 보고 고르는 게 이 화면의 존재 이유라, 낡은 숫자는 의미가 없다.
 """
+import functools
 import os
 import re
 import subprocess
@@ -100,6 +101,12 @@ def short(text, n):
     return text if len(text) <= n else text[:n - 1] + "…"
 
 
+@functools.cache
+def fable_shown():
+    """Fable 창이 있는 계정이 하나라도 있을 때만 그 칸을 보인다 (권한 없는 사람에겐 빈 칸일 뿐)."""
+    return any(st.scoped(st.usage(a["num"]), "Fable") for a in st.accounts())
+
+
 def row(a, selected, is_default):
     """계정 한 줄. selected=커서 위치, is_default=cwd 매핑 기본값."""
     g = st.usage(a["num"]) or {}
@@ -115,7 +122,7 @@ def row(a, selected, is_default):
     mark = f"{DIM}·{R}" if is_default and not selected else " "
     name = f"{REV}{kc}{pad(a['label'], 12)}{R}" if selected else f"{kc}{pad(a['label'], 12)}{R}"
     return (f" {cursor}{mark}{a['num']}) {name} {kc}{pad(short(st.group(a['num']), 9), 9)}{R}"
-            f"{cell(g.get('five_hour'))} {cell(g.get('seven_day'))} {cell(fable, 6)}  {note}")
+            f"{cell(g.get('five_hour'))} {cell(g.get('seven_day'))}" + (f" {cell(fable, 6)}" if fable_shown() else "") + f"  {note}")
 
 
 def header(interactive, width=10**4):
@@ -123,7 +130,7 @@ def header(interactive, width=10**4):
             if interactive else L("number/alias · Enter = default · q cancel", "번호/별칭 입력 · Enter = 기본값 · q 취소"))
     print(clip(f"\n{BOLD}" + L("Choose an account", "계정 선택") + f"{R} {DIM}({hint}){R}", width), file=E)
     head = (f"      {pad(L('Account', '계정'), 12)} {pad(L('Group', '그룹'), 9)}"
-            f"{'5h':>4} {'1w':>4} {'Fable':>6}  {L('Reset', '리셋')}")
+            f"{'5h':>4} {'1w':>4}" + (f" {'Fable':>6}" if fable_shown() else "") + f"  {L('1w reset', '주간 리셋')}")
     print(clip(DIM + head + R, width), file=E)
 
 
@@ -248,7 +255,7 @@ def main():
         print(DIM + L("Cancelled.", "취소했습니다.") + R, file=E)
         return 1
     chosen = accs[idx]
-    print(f"{DIM}→ {chosen['label']} [{st.group(chosen['num'])}]{R}", file=E)
+    print(f"{DIM}→ {chosen['label']}{st.group_tag(chosen)}{R}", file=E)
     print(chosen["num"])
     return 0
 

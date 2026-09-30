@@ -14,9 +14,9 @@ RAW = Image.open(HERE / "hud-raw.png").convert("RGB")
 PAD_X, CHAR = 40, 20.3             # hud.tape: Padding 40, FontSize 32 → 고정폭 글자 한 칸 (실측)
 LINES = [(48, 87), (87, 125), (125, 164)]  # 세 줄의 세로 범위 (2x)
 TEXT = [
-    "● work [WORK] · Opus 5.5[1M] ▰▰▰▱▱ high ▌ Lv.60  · ctx 12% · ~/src/app (ft/login-302*)",
+    "● acme [WORK] · Opus 5.5[1M] ▰▰▰▱▱ high ▌ Lv.60  · ctx 12% · ~/src/app (ft/login-302*)",
     "5h ██░░░░ 31% 2h05m │ 1w █░░░░░ 11% 3d10h │ Fable ░░░░░░ 0% │ ↔ side 12%/40%, personal 4%/23% +1 more",
-    "⟳ Update ▮▮▮ · ⏾ Sleep ▮▮▮ 90m · ⇄ Auto-swap ▮▮▮ same group",
+    "⟳ Update ▮▮▮ · ⏾ Sleep ▮▮▮ 90m · ⇄ Auto-swap ▮▮▮ same group only",
 ]
 # (줄, 그 줄에서 가리킬 글자, 영어, 한국어)
 ITEMS = [

@@ -162,7 +162,7 @@ def cmd_request(argv, sid_override=None):
                   + L("(session id unknown, so this starts a new conversation)", "(세션 ID 를 몰라 새 대화로 엽니다)") + R)
         return 3
 
-    print(f"{GRN}✓{R} " + L("Next account: ", "다음 계정: ") + f"{BOLD}{target['label']}{R} [{st.group(target['num'])}]"
+    print(f"{GRN}✓{R} " + L("Next account: ", "다음 계정: ") + f"{BOLD}{target['label']}{R}{st.group_tag(target)}"
           + (f"  {YEL}" + L("(group crossing approved)", "(그룹 교차 승인됨)") + R if cross else ""))
     print(f"  {DIM}" + L(f"Press Ctrl+D to continue this exact conversation on {target['label']}.",
                          f"Ctrl+D 를 누르면 이 대화 그대로 {target['label']} 계정에서 이어집니다.") + R)

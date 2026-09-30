@@ -292,6 +292,12 @@ def group(num):
     return g or "unknown"
 
 
+def group_tag(acc):
+    """' [그룹]'. 이름과 그룹이 같으면(personal [personal]) 빈 문자열."""
+    g = group(acc["num"])
+    return "" if g == str(acc["label"]).lower() else f" [{g}]"
+
+
 # 색을 안 정한 그룹은 처음 나온 순서대로 받는다. 앞의 둘은 0.1 이전 personal(파랑)·team(주황) 과 같다.
 PALETTE = (39, 208, 170, 42, 220, 203, 81, 214)
 

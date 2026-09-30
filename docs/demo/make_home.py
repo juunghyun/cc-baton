@@ -22,7 +22,7 @@ def write(rel, data):
     p.write_text(json.dumps(data, indent=2))
 
 
-accounts = [("1", "work", "work@example.com", 31, 11), ("2", "personal", "me@example.com", 4, 23),
+accounts = [("1", "acme", "work@example.com", 31, 11), ("2", "personal", "me@example.com", 4, 23),
             ("3", "side", "side@example.com", 12, 40), ("4", "spare", "spare@example.com", 0, 2)]
 write(".claude-swap-backup/sequence.json", {
     "activeAccountNumber": 1, "sequence": [int(a[0]) for a in accounts],

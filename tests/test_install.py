@@ -201,3 +201,13 @@ def test_paths_under_home_are_written_with_dollar_home(home, inst):
     assert data["statusLine"]["command"] == '"$HOME"/.local/bin/cc-baton statusline'
     assert '"$HOME"/.local/bin/cc-baton swap hook prompt' in our_commands(data)
     assert str(home.root) not in json.dumps(data)  # settings.json 에 사용자 경로가 안 남는다
+
+
+
+def test_settings_backups_are_capped(home, inst):
+    home.write_json(".claude/settings.json", {"theme": "dark"})
+    for stamp in ("20260101000000", "20260102000000", "20260103000000", "20260104000000"):  # 예전 설치들이 남긴 백업
+        (home.settings.parent / f"settings.json.bak-cc-baton-{stamp}").write_text("{}")
+    inst("install")
+    left = sorted(p.name for p in home.settings.parent.glob("settings.json.bak-cc-baton-*"))
+    assert len(left) == 3 and "settings.json.bak-cc-baton-20260101000000" not in left  # 오래된 것부터 지운다

@@ -9,21 +9,21 @@ from . import state as st
 from .i18n import L
 
 USAGE_EN = """cc-baton toggle                          show switches
-cc-baton toggle update|hib|swap|usage|bypass on|off   turn one on or off
-cc-baton toggle is-on update|hib|swap    for scripts (exit 0 = on)
+cc-baton toggle update|sleep|autoswap|usage|bypass on|off   turn one on or off
+cc-baton toggle is-on <name>             for scripts (exit 0 = on)
 
   update  update Claude Code before each launch and swap (npm install only)
-  hib     hibernate idle sessions automatically (manual /sleep always works)
-  swap    prepare a swap to another of your accounts when one hits its usage limit
+  sleep   put idle sessions to sleep automatically (manual /sleep always works)
+  autoswap prepare a swap to another of your accounts when one hits its usage limit
   usage   keep usage numbers fresh (claude-swap asks Anthropic's usage endpoint per account)
   bypass  start sessions with --dangerously-skip-permissions (Claude runs commands without asking)"""
 USAGE_KO = """cc-baton toggle                          현황
-cc-baton toggle update|hib|swap|usage|bypass on|off   켜기/끄기
-cc-baton toggle is-on update|hib|swap    스크립트용 (exit 0 = 켜짐)
+cc-baton toggle update|sleep|autoswap|usage|bypass on|off   켜기/끄기
+cc-baton toggle is-on <이름>             스크립트용 (exit 0 = 켜짐)
 
   update  실행·스왑 직전 Claude Code 최신화 (npm 설치본만)
-  hib     유휴 세션 자동 재우기 (/sleep 수동 재우기는 끄지 않는다)
-  swap    한도에 걸린 계정이 있으면 다른 내 계정으로 스왑을 준비
+  sleep   유휴 세션 자동 재우기 (/sleep 수동 재우기는 끄지 않는다)
+  autoswap 한도에 걸린 계정이 있으면 다른 내 계정으로 스왑을 준비
   usage   사용량 숫자를 최신으로 (claude-swap 이 계정마다 Anthropic 사용량 API 를 조회)
   bypass  --dangerously-skip-permissions 로 세션 시작 (Claude 가 묻지 않고 명령 실행)"""
 
@@ -55,8 +55,9 @@ def main(argv=None):
     elif argv:
         print(L(USAGE_EN, USAGE_KO), file=sys.stderr)
         return 1
+    shown = {v: k for k, v in ALIASES.items()}
     for name, key in KEYS.items():
-        print(f"{name:<7} {'on' if st.feature(key)['enabled'] else 'off'}")
+        print(f"{shown.get(name, name):<8} {'on' if st.feature(key)['enabled'] else 'off'}")
     return 0
 
 

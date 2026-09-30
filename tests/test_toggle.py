@@ -3,7 +3,7 @@ import json
 
 def test_toggle_roundtrip_keeps_other_settings(home):
     r = home.run("toggle", "hib", "off")
-    assert r.returncode == 0 and "hib     off" in r.stdout
+    assert r.returncode == 0 and "sleep    off" in r.stdout
     cfg = json.loads(home.config.read_text())
     assert cfg["hibernate"] == {"enabled": False, "idleMin": 90}
     assert cfg["1"] == {"kind": "personal"}  # 계정 설정은 그대로

@@ -16,7 +16,7 @@ def usage():
     return L("""cc-baton <command> [args…]
 
   install        Wire cc-baton into Claude Code (no questions, safe to re-run)
-  setup          Setup wizard: language, account groups, HUD, hibernation, auto-swap (runs on first `baton`)
+  setup          Setup wizard: language, account groups, HUD, sleep, auto-swap (runs on first `baton`)
   uninstall      Remove what cc-baton added (--purge: settings and state too, --yes: don't ask)
   upgrade        Upgrade cc-baton and re-apply the wiring
   lang [en|ko]   Show or change the display language
@@ -24,7 +24,7 @@ def usage():
   swap           Account swap: request <account> | consume | handoff <account> | hook prompt|limit
   pick           Account picker (prints the chosen account number)
   toggle         Feature switches: update|hib|swap on|off, is-on <name>
-  hib            Hibernate idle sessions: scan | tick | sleep | wake | list | resume …
+  hib            Idle-session sleep: scan | tick | sleep | wake | list | resume …
   statusline     Claude Code statusLine command
   claude-update  Update Claude Code (npm install; `baton` runs it before launch)
   cswap          Run the bundled claude-swap""", """cc-baton <하위명령> [인자…]

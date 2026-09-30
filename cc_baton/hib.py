@@ -388,7 +388,7 @@ def tty_note(row):
     tty 에 직접 쓰면 TUI 를 건드리지 않고 프롬프트 옆에 찍힌다(검증됨)."""
     try:
         with open(f"/dev/{row['tty']}", "w") as t:
-            t.write("\n  \033[38;5;170m💤 " + L("This session was hibernated to free memory", "이 세션은 메모리 회수를 위해 재워졌습니다")
+            t.write("\n  \033[38;5;170m💤 " + L("This session was put to sleep to free memory", "이 세션은 메모리 회수를 위해 재워졌습니다")
                     + f"\033[0m  \033[2m({row['rss']}MB)\033[0m\n"
                     + "  \033[2m" + L("The conversation is intact. To come back:", "대화는 그대로입니다. 돌아가려면:")
                     + "\033[0m baton --wake\n\n")
@@ -456,8 +456,8 @@ def cmd_tick(argv):
             ok, msg = do_sleep(row, p.get("reason", ""))
             f.unlink(missing_ok=True)
             slept.add(row["tty"])
-            acted.append(L(f"{row['name']} hibernated: {msg}", f"{row['name']} 재움 — {msg}"))
-            notify(L("Session hibernated", "세션 재움"), f"{row['name']} · {row['cwd'].split('/')[-1]} — {msg}")
+            acted.append(L(f"{row['name']} put to sleep: {msg}", f"{row['name']} 재움 — {msg}"))
+            notify(L("Session put to sleep", "세션 재움"), f"{row['name']} · {row['cwd'].split('/')[-1]} — {msg}")
 
     # 2) 새 후보에 유예 걸기
     pending_ttys = {(_load(f) or {}).get("tty") for f in PENDING.glob("*.json")}
@@ -470,10 +470,10 @@ def cmd_tick(argv):
         _save(PENDING / f"{r['tty']}.json", {
             "tty": r["tty"], "sid": r["sid"], "name": r["name"], "reason": w,
             "dueAt": time.time() + GRACE_SEC, "idleAtRequest": r["idle_min"]})
-        acted.append(L(f"{r['name']} grace started (hibernates in {GRACE_SEC/60:.0f}m)", f"{r['name']} 유예 시작({GRACE_SEC/60:.0f}분 뒤 재움)"))
-        notify(L("Session about to hibernate", "세션 재우기 예고"),
+        acted.append(L(f"{r['name']} grace started (sleeps in {GRACE_SEC/60:.0f}m)", f"{r['name']} 유예 시작({GRACE_SEC/60:.0f}분 뒤 재움)"))
+        notify(L("Session about to sleep", "세션 재우기 예고"),
                f"{r['name']} · {r['cwd'].split('/')[-1]} — "
-               + L(f"hibernates in {GRACE_SEC/60:.0f}m. Type anything in that tab to cancel.",
+               + L(f"sleeps in {GRACE_SEC/60:.0f}m. Type anything in that tab to cancel.",
                    f"{GRACE_SEC/60:.0f}분 뒤 재웁니다. 그 탭에서 아무거나 입력하면 취소됩니다."))
     snapshot(rows)
 
@@ -553,7 +553,7 @@ def cmd_sleep(argv):
             ok, msg = do_sleep(r, L(f"manual batch {th:.0f}m", f"수동 일괄 {th:.0f}분"), selfkill=(r["pid"] == me))
             print(f"{GRN}✓{R} {r['name']} — {msg}" if ok else f"{RED}✗{R} {r['name']}: {msg}")
         if targets and not dry:
-            print("\n" + L(f"{len(targets)} hibernated · freed {sum(r['rss'] for r in targets)}MB",
+            print("\n" + L(f"{len(targets)} put to sleep · freed {sum(r['rss'] for r in targets)}MB",
                    f"{len(targets)}개 재움 · {sum(r['rss'] for r in targets)}MB 회수"))
         for r, why in skipped:
             print(DIM + L(f"skipped {r['name']}: {why}", f"건너뜀 {r['name']} — {why}") + R)
@@ -571,7 +571,7 @@ def cmd_sleep(argv):
 
     b = blockers(tail_records(row["transcript"]), now) if row["transcript"] else [L("no transcript", "트랜스크립트 없음")]
     if b and not force:
-        print(f"{YEL}!{R} {row['name']}: {', '.join(b)} — " + L("hibernating now would lose it. Use --force to do it anyway",
+        print(f"{YEL}!{R} {row['name']}: {', '.join(b)} — " + L("putting it to sleep now would lose it. Use --force to do it anyway",
                                                               "재우면 잃습니다. 그래도 재우려면 --force"), file=E)
         return 1
     if b:
@@ -583,16 +583,16 @@ def cmd_sleep(argv):
                              "대화는 안전하고 baton --wake 로 돌아옵니다. 그래도 재우려면 --force") + R, file=E)
         return 1
     if dry:
-        print(f"{DIM}[dry]{R} " + L(f"would hibernate {row['name']} ({row['pid']}, {row['rss']}MB)", f"{row['name']} ({row['pid']}, {row['rss']}MB) 를 재웁니다"))
+        print(f"{DIM}[dry]{R} " + L(f"would put {row['name']} to sleep ({row['pid']}, {row['rss']}MB)", f"{row['name']} ({row['pid']}, {row['rss']}MB) 를 재웁니다"))
         return 0
 
     selfk = (row["pid"] == me) or (row["pid"] in set(ancestors()))
     if selfk:
-        print(f"{MAG}💤{R} " + L(f"Hibernating this session ({row['rss']}MB). ", f"이 세션을 재웁니다 — {row['rss']}MB. ")
+        print(f"{MAG}💤{R} " + L(f"Putting this session to sleep ({row['rss']}MB). ", f"이 세션을 재웁니다 — {row['rss']}MB. ")
               + DIM + L("Press any key in this tab or run baton --wake to come back", "깨우려면 이 탭에서 키를 누르거나 baton --wake") + R)
     ok, msg = do_sleep(row, L("manual", "수동"), selfkill=selfk)
     if not selfk:
-        print(f"{GRN}✓{R} " + L(f"{row['name']} hibernated: {msg}", f"{row['name']} 재움 — {msg}") if ok else f"{RED}✗{R} {msg}")
+        print(f"{GRN}✓{R} " + L(f"{row['name']} put to sleep: {msg}", f"{row['name']} 재움 — {msg}") if ok else f"{RED}✗{R} {msg}")
     return 0 if ok else 1
 
 
@@ -622,7 +622,7 @@ def cmd_banner(argv):
     # 탭 제목. claude 가 죽으면 탭이 'zsh' 로 돌아가 어느 세션인지 모른다. 깨우면 claude 가 다시 덮어쓴다.
     print(f"\033]0;⏾ {name}\007", end="")
     print()
-    print(f"  {MAG}💤 " + L("Hibernated", "재움") + f"{R}  {BOLD}{name}{R}  {DIM}{cwd}{R}")
+    print(f"  {MAG}💤 " + L("Asleep", "재움") + f"{R}  {BOLD}{name}{R}  {DIM}{cwd}{R}")
     print(f"  {DIM}{when} · " + L(f"freed {rss}MB · conversation kept as is", f"{rss}MB 회수 · 맥락은 그대로 보존됨") + R)
     print(f"  {CYA}" + L("Press any key to pick up where you left off", "아무 키나 누르면 이어서 시작합니다") + f"{R} {DIM}"
           + L("(Ctrl-C closes the tab)", "(Ctrl-C 로 탭 종료)") + R)
@@ -693,7 +693,7 @@ def cmd_list(argv):
         print(json.dumps(items, ensure_ascii=False))
         return 0
     if not items:
-        print(DIM + L("No hibernated sessions", "재운 세션 없음") + R)
+        print(DIM + L("No sleeping sessions", "재운 세션 없음") + R)
         return 0
     print(f"{'':>3} {L('from', '출처'):<5} {L('when', '언제'):<7} {'name':<15} {L('acct', '계정'):<4} cwd")
     print("─" * 92)
@@ -710,9 +710,9 @@ def cmd_pick(argv):
     """피커. 선택 결과를 'account\\tsid\\tcwd' 로 stdout 에 뱉는다(화면은 stderr)."""
     items = parked_list()
     if not items:
-        print(DIM + L("No hibernated sessions.", "재운 세션이 없습니다.") + R, file=E)
+        print(DIM + L("No sleeping sessions.", "재운 세션이 없습니다.") + R, file=E)
         return 1
-    print(f"\n  {BOLD}" + L("Hibernated sessions", "재운 세션") + f"{R}\n", file=E)
+    print(f"\n  {BOLD}" + L("Sleeping sessions", "재운 세션") + f"{R}\n", file=E)
     for i, d in enumerate(items, 1):
         when = (datetime.datetime.fromtimestamp(d["hibernatedAt"]).strftime("%m-%d %H:%M")
                 if d.get("hibernatedAt") else "—")

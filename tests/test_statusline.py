@@ -37,8 +37,10 @@ def test_unknown_or_missing_effort(home):
 
 def test_identity_from_session_profile(home):
     line1 = plain(render(home, "high", CLAUDE_CONFIG_DIR=home.root / TEAM_PROFILE)[0])
-    assert line1.startswith("● team [TEAM]")
-    assert plain(render(home, "high")[0]).startswith("● personal [PERSONAL]")
+    assert line1.startswith("● team ·")  # 이름과 그룹이 같으면 [TEAM] 을 되풀이하지 않는다
+    assert plain(render(home, "high")[0]).startswith("● personal ·")
+    home.set_config(**{"1": {"group": "side"}})
+    assert plain(render(home, "high")[0]).startswith("● personal [SIDE]")
 
 
 @pytest.mark.parametrize("columns", [140, 80, 60, 45])

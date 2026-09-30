@@ -280,7 +280,9 @@ def main():
     ktext = st.group(num).upper() if num and st.group(num) != "unknown" else "?"
 
     # --- line 1: 정체성 + 세션 상태 ---
-    badge = f"{kcolor}●{R} {BOLD}{kcolor}{label}{R} {kcolor}[{ktext}]{R}"
+    badge = f"{kcolor}●{R} {BOLD}{kcolor}{label}{R}"
+    if ktext.lower() != str(label).lower():  # personal [PERSONAL] 처럼 이름과 그룹이 같으면 한 번만
+        badge += f" {kcolor}[{ktext}]{R}"
     if num is None:
         # 라이브 자격증명이 어느 슬롯에도 없다 — cswap 이 모르는 계정으로 돌고 있다.
         badge += f" {DIM}" + L("(not registered · run cswap add)", "(미등록 · cswap add 로 등록)") + R

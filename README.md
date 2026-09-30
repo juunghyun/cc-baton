@@ -25,7 +25,7 @@ command -v uv >/dev/null || { curl -LsSf https://astral.sh/uv/install.sh | sh &&
 uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton && ~/.local/bin/cc-baton install
 ```
 
-Open a new terminal and run **`baton`** (a zsh function; macOS uses zsh by default). From now on, start Claude Code with `baton` instead of `claude`. The first run asks a few questions (language, account groups and short names, HUD, hibernation, auto-swap, usage refresh, permission prompts), then shows the account picker. Accounts live in [claude-swap](https://github.com/realiti4/claude-swap), which comes bundled: log in to Claude Code and run `cswap add` for each account. With a single account you still get the HUD and hibernation.
+Open a new terminal and run **`baton`** (a zsh function; macOS uses zsh by default). From now on, start Claude Code with `baton` instead of `claude`. The first run asks a few questions (language, account groups and short names, HUD, sleep, auto-swap, usage refresh, permission prompts), then shows the account picker. Accounts live in [claude-swap](https://github.com/realiti4/claude-swap), which comes bundled: log in to Claude Code and run `cswap add` for each account. With a single account you still get the HUD and sleep.
 
 `cc-baton install` never asks anything and is safe to re-run. It backs up `~/.claude/settings.json` before touching it and never replaces a statusline you already have without asking.
 
@@ -56,8 +56,8 @@ Run exactly the two lines above. Don't edit `~/.claude/settings.json` or `~/.zsh
 |---|---|
 | `baton` | Pick an account and start Claude Code (`baton work` to name one) |
 | `/swap <account>` | Move this conversation to another account (number, short name or email), then press Ctrl+D |
-| `/sleep` | Hibernate this session now |
-| `baton --wake` | Bring back a hibernated session |
+| `/sleep` | Put this session to sleep now |
+| `baton --wake` | Bring back a sleeping session |
 | `cc-baton toggle update\|sleep\|autoswap\|usage\|bypass on\|off` | Turn a feature on or off |
 | `cc-baton setup` · `lang en\|ko` · `upgrade` | Setup again · display language · update cc-baton |
 

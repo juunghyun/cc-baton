@@ -34,6 +34,7 @@ HIB_PLIST = LAUNCH_AGENTS / f"{st.HIB_LABEL}.plist"
 HIB_LOG = st.STATE_DIR / "hib.log"
 ZSH_BEGIN, ZSH_END = "# >>> cc-baton >>>", "# <<< cc-baton <<<"
 CCLEGAL_URL = "https://code.claude.com/docs/en/legal-and-compliance"
+BACKUPS_KEPT = 3
 CMD_MARK = "<!-- installed by cc-baton; `cc-baton uninstall` removes this file -->"
 
 
@@ -131,6 +132,9 @@ class Settings:
         if self.path.exists():
             backup = self.path.with_name(f"{self.path.name}.bak-cc-baton-{time.strftime('%Y%m%d%H%M%S')}")
             shutil.copy2(self.path, backup)
+            # 백업은 최근 BACKUPS_KEPT 개만 (설치·위저드·제거마다 하나씩 쌓인다). 이름에 시각이 들어 있어 정렬이 곧 시간순
+            for old in sorted(self.path.parent.glob(f"{self.path.name}.bak-cc-baton-*"))[:-BACKUPS_KEPT]:
+                old.unlink(missing_ok=True)
         _write_json(self.path, self.data)
         return L(f"backup {backup.name}", f"백업 {backup.name}") if backup else L("created", "새로 만듦")
 
@@ -382,11 +386,14 @@ def cmd_install(argv):
     cfg = st.config()
     if "autoUpdate" not in cfg:  # npm 으로 깐 Claude Code 만 우리가 올린다. 공식 설치본은 자체 자동 업데이트
         save_config(autoUpdate={"enabled": st.claude_is_npm()})
+        if st.claude_is_npm():  # 묻지 않고 켜는 유일한 기능이라 알린다
+            report.append(L("Claude Code auto-update: on, because it's an npm install (cc-baton toggle update off to stop)",
+                            "Claude Code 자동 업데이트: npm 설치본이라 켰습니다 (끄려면 cc-baton toggle update off)"))
     if cfg.get("language") not in i18n.LANGS:  # 설치 보고와 위저드, HUD 가 같은 언어를 쓰게 고정
         save_config(language=i18n.lang())
     if HIB_PLIST.exists():  # 이미 켜 둔 절전만 새 경로로 갱신. 새로 등록은 위저드에서만
         register_hib(exe)
-        report.append(L("hibernate launchd agent: updated to the new path", "절전 launchd: 새 경로로 갱신"))
+        report.append(L("sleep launchd agent: updated to the new path", "절전 launchd: 새 경로로 갱신"))
 
     inst["installedAt"] = time.time()
     inst["exe"] = exe
@@ -541,11 +548,11 @@ def cmd_setup(argv):
             w("  → " + L("in place", "적용돼 있습니다"))
 
         # 3) 절전
-        w("\n" + BOLD + L("3. Hibernate", "3. 절전") + R + " " + DIM
+        w("\n" + BOLD + L("3. Sleep", "3. 절전") + R + " " + DIM
           + L("— stops the process of sessions left idle, keeps the tab and the conversation. Any key resumes",
               "— 오래 쉬는 세션의 프로세스를 끄고, 탭과 대화는 남깁니다. 키 하나로 이어서 시작") + R)
         hib = st.feature("hibernate")
-        if t.yes("  " + L("Hibernate idle sessions automatically?", "유휴 세션 자동 재우기를 켤까요?"), hib["enabled"]):
+        if t.yes("  " + L("Put idle sessions to sleep automatically?", "유휴 세션 자동 재우기를 켤까요?"), hib["enabled"]):
             m = t.ask("  " + L("After how many idle minutes?", "몇 분 쉬면 재울까요?") + f" [{hib['idleMin']:g}]: ",
                       str(hib["idleMin"]))
             try:
@@ -689,7 +696,7 @@ def cmd_uninstall(argv):
             report.append(L("~/.zshrc block: removed (open shells change once reopened)",
                             "~/.zshrc 블록: 제거 (열려 있는 셸은 새로 열면 반영)"))
     if unregister_hib():
-        report.append(L("hibernate launchd agent: removed", "절전 launchd: 해제"))
+        report.append(L("sleep launchd agent: removed", "절전 launchd: 해제"))
 
     link = Path.home() / ".local" / "bin" / "cswap"
     bundled = Path(sys.executable).parent / "cswap"
@@ -704,7 +711,7 @@ def cmd_uninstall(argv):
             report.append(L("cswap: removed (account data in ~/.claude-swap-backup is kept)",
                             "cswap: 제거 (계정 데이터 ~/.claude-swap-backup 은 그대로)"))
 
-    if purge or ask(L("Also delete settings and state (account groups, state, hibernate log)?",
+    if purge or ask(L("Also delete settings and state (account groups, state, sleep log)?",
                       "설정·기록(계정 그룹, 상태, 절전 로그)까지 지울까요?"), False):
         st.LEGACY_CONFIG.unlink(missing_ok=True)  # 남기면 다음 실행 때 새 위치로 다시 복사된다
         for p in (st.CONFIG_PATH.parent, st.STATE_DIR, *st.LEGACY_STATE):

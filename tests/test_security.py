@@ -94,6 +94,7 @@ def test_unknown_groups_count_as_crossing(home):
 def test_hib_resume_passes_session_as_arguments_not_shell_code(home):
     parked = home.state / "hib/parked"
     parked.mkdir(parents=True)
+    home.transcript(TEAM_PROFILE, SID)  # 트랜스크립트가 있어야 되살릴 목록에 오른다
     (parked / f"{SID}.json").write_text(json.dumps({"sid": SID, "account": "2", "cwd": str(home.root), "name": "x",
                                                      "hibernatedAt": time.time()}))
     log = home.root / "zsh-args"
@@ -106,6 +107,7 @@ def test_hib_resume_passes_session_as_arguments_not_shell_code(home):
 def test_hib_resume_puts_the_session_back_when_it_fails(home):
     parked = home.state / "hib/parked"
     parked.mkdir(parents=True)
+    home.transcript(TEAM_PROFILE, SID)  # 트랜스크립트가 있어야 되살릴 목록에 오른다
     marker = parked / f"{SID}.json"
     marker.write_text(json.dumps({"sid": SID, "account": "2", "cwd": str(home.root), "name": "x", "hibernatedAt": time.time()}))
     for rc, kept in ((1, True), (0, False)):
@@ -119,6 +121,7 @@ def test_hib_resume_puts_the_session_back_when_it_fails(home):
 def test_restore_script_cannot_smuggle_commands(home):
     parked = home.state / "hib/parked"
     parked.mkdir(parents=True)
+    home.transcript(TEAM_PROFILE, SID)  # 트랜스크립트가 있어야 되살릴 목록에 오른다
     (parked / f"{SID}.json").write_text(json.dumps({"sid": SID, "account": "2", "cwd": "/tmp/p\ntouch PWNED\n#",
                                                      "name": "n", "hibernatedAt": time.time()}))
     out = home.root / "restore.sh"

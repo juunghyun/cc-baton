@@ -2,7 +2,7 @@
 import json
 import time
 
-from conftest import plain
+from conftest import TEAM_PROFILE, plain
 
 EXE = "/opt/cc-baton/bin/cc-baton"
 SID_A = "aaaaaaaa-0000-0000-0000-000000000000"
@@ -58,3 +58,34 @@ def test_claude_update_returns_at_once_without_npm(home):
     t = time.time()
     assert home.run("claude-update", NPM_PREFIX="").returncode == 0
     assert time.time() - t < 5 and not (home.root / "curl-called").exists()
+
+
+def test_sleep_banner_names_the_session_not_the_registry_slug(home):
+    parked = home.state / "hib/parked"
+    parked.mkdir(parents=True)
+    (parked / f"{SID_A}.json").write_text(json.dumps({"sid": SID_A, "cwd": str(home.root), "name": "workspace-93",
+                                                       "profile": str(home.root / TEAM_PROFILE), "rss": 300,
+                                                       "hibernatedAt": time.time()}))
+    # 스왑을 거쳐 트랜스크립트가 기록된 프로필이 아닌 쪽에 있다. /rename 이름이 자동 제목보다 앞선다.
+    home.transcript(".claude", SID_A, body="\n".join(json.dumps(d) for d in (
+        {"type": "ai-title", "aiTitle": "auto title"},
+        {"type": "agent-name", "agentName": "renamed"},
+        {"type": "last-prompt", "lastPrompt": "fix the\nbanner"})) + "\n")
+    out = home.run("hib", "banner", SID_A).stdout
+    assert "\x1b]0;💤 renamed\x07" in out
+    text = plain(out)
+    assert "workspace-93" not in text and "renamed" in text and "fix the banner" in text
+
+
+def test_parked_sessions_without_a_transcript_are_hidden_then_cleaned(home):
+    gone = "bbbbbbbb-0000-0000-0000-000000000000"
+    parked = home.state / "hib/parked"
+    parked.mkdir(parents=True)
+    for sid, name in ((SID_A, "workspace-1"), (gone, "workspace-2")):
+        (parked / f"{sid}.json").write_text(json.dumps({"sid": sid, "cwd": str(home.root), "name": name,
+                                                        "hibernatedAt": time.time()}))
+    home.transcript(TEAM_PROFILE, SID_A, body=json.dumps({"type": "ai-title", "aiTitle": "결정 기준"}) + "\n")
+    out = plain(home.run("hib", "list").stdout)
+    assert "결정 기준" in out and "workspace-2" not in out
+    home.run("hib", "clean")
+    assert (parked / f"{SID_A}.json").exists() and not (parked / f"{gone}.json").exists()

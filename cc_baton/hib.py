@@ -389,7 +389,7 @@ def tty_note(row):
     try:
         with open(f"/dev/{row['tty']}", "w") as t:
             t.write("\n  \033[38;5;170m💤 " + L("This session was put to sleep to free memory", "이 세션은 메모리 회수를 위해 재워졌습니다")
-                    + f"\033[0m  \033[2m({row['rss']}MB)\033[0m\n"
+                    + f"\033[0m  \033[1m{label(row)}\033[0m  \033[2m({row['rss']}MB)\033[0m\n"
                     + "  \033[2m" + L("The conversation is intact. To come back:", "대화는 그대로입니다. 돌아가려면:")
                     + "\033[0m baton --wake\n\n")
     except OSError:
@@ -457,7 +457,7 @@ def cmd_tick(argv):
             f.unlink(missing_ok=True)
             slept.add(row["tty"])
             acted.append(L(f"{row['name']} put to sleep: {msg}", f"{row['name']} 재움 — {msg}"))
-            notify(L("Session put to sleep", "세션 재움"), f"{row['name']} · {row['cwd'].split('/')[-1]} — {msg}")
+            notify(L("Session put to sleep", "세션 재움"), f"{label(row)} · {row['cwd'].split('/')[-1]} — {msg}")
 
     # 2) 새 후보에 유예 걸기
     pending_ttys = {(_load(f) or {}).get("tty") for f in PENDING.glob("*.json")}
@@ -472,7 +472,7 @@ def cmd_tick(argv):
             "dueAt": time.time() + GRACE_SEC, "idleAtRequest": r["idle_min"]})
         acted.append(L(f"{r['name']} grace started (sleeps in {GRACE_SEC/60:.0f}m)", f"{r['name']} 유예 시작({GRACE_SEC/60:.0f}분 뒤 재움)"))
         notify(L("Session about to sleep", "세션 재우기 예고"),
-               f"{r['name']} · {r['cwd'].split('/')[-1]} — "
+               f"{label(r)} · {r['cwd'].split('/')[-1]} — "
                + L(f"sleeps in {GRACE_SEC/60:.0f}m. Type anything in that tab to cancel.",
                    f"{GRACE_SEC/60:.0f}분 뒤 재웁니다. 그 탭에서 아무거나 입력하면 취소됩니다."))
     snapshot(rows)
@@ -612,17 +612,107 @@ def cmd_claim(argv):
     return 0
 
 
+def transcript_meta(path):
+    """(세션 제목, 마지막 요청). 레지스트리 name 은 'workspace-df' 같은 자동 이름이라 무슨 세션인지 모른다.
+    제목은 /rename 으로 붙인 이름(agent-name)이 자동 제목(ai-title)보다 앞선다. 둘 다 매 턴 다시 기록되니 꼬리만 봐도 된다."""
+    named = auto = prompt = None
+    lines = []
+    try:
+        if path:
+            with open(path, "rb") as f:
+                f.seek(max(0, os.path.getsize(path) - TAIL))
+                lines = f.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        pass
+    for line in lines:
+        # 목록 화면은 세션마다 이걸 부른다. 꼬리 전체를 파싱하지 않고 해당 레코드만 연다.
+        if "agent-name" not in line and "ai-title" not in line and "last-prompt" not in line:
+            continue
+        try:
+            d = json.loads(line)
+        except Exception:
+            continue                                # 잘린 첫 줄
+        t = d.get("type") if isinstance(d, dict) else None
+        if t == "agent-name":
+            named = d.get("agentName") or named
+        elif t == "ai-title":
+            auto = d.get("aiTitle") or auto
+        elif t == "last-prompt":
+            prompt = d.get("lastPrompt") or prompt
+    return named or auto, prompt
+
+
+def find_transcript(sid, profile=None):
+    """스왑을 거치면 트랜스크립트가 기록된 프로필이 아닌 다른 계정 쪽에 있을 수 있다. 기록된 프로필부터 본다."""
+    if not st.valid_sid(sid):
+        return None
+    for prof in ([Path(profile)] if profile else []) + profiles():
+        hits = sorted(prof.glob(f"projects/*/{sid}.jsonl"))
+        if hits:
+            return hits[0]
+    return None
+
+
+def fit(s, w):
+    """표시 폭 기준으로 자르고 채운다. 세션 제목은 대개 한글(두 칸)이라 문자 수로 맞추면 열이 어긋난다."""
+    from .pick import cw
+    out, used = "", 0
+    for ch in s:
+        if used + cw(ch) > w:
+            break
+        out += ch
+        used += cw(ch)
+    return out + " " * (w - used)
+
+
+def label(d):
+    """화면에 쓸 세션 이름: 세션 제목 → 레지스트리 자동 이름 → sid 앞부분."""
+    title = d["title"] if "title" in d else transcript_meta(
+        d.get("transcript") or find_transcript(d.get("sid"), d.get("profile")))[0]   # parked_list 가 미리 채워 둔다
+    return st.clean(title or d.get("name") or str(d.get("sid") or "")[:8])
+
+
+def git_where(cwd):
+    """(브랜치, 워크트리 이름). 워크트리 이름은 링크된 워크트리일 때만 — 본 체크아웃이면 None."""
+    if not cwd or not os.path.isdir(cwd):
+        return None, None
+    try:
+        o = subprocess.run(["git", "-C", cwd, "rev-parse", "--path-format=absolute", "--show-toplevel",
+                            "--git-dir", "--git-common-dir", "--abbrev-ref", "HEAD"],
+                           capture_output=True, text=True, timeout=3)
+    except Exception:
+        return None, None
+    lines = o.stdout.splitlines()
+    if o.returncode or len(lines) < 4:
+        return None, None
+    top, gitdir, common, branch = lines[:4]
+    wt = Path(top).name if Path(gitdir).resolve() != Path(common).resolve() else None
+    return (None if branch == "HEAD" else branch), wt
+
+
 def cmd_banner(argv):
+    from .pick import clip, cols
     sid = argv[0] if argv else ""
     d = (_load(PARKED / f"{sid}.json") or {}) if st.valid_sid(sid) else {}
-    name = st.clean(d.get("name") or sid[:8])
+    title, prompt = transcript_meta(find_transcript(sid, d.get("profile")))
+    name = st.clean(title or d.get("name") or sid[:8])
     cwd = st.clean(d.get("cwd") or "")
+    branch, wt = git_where(d.get("cwd"))
     rss = d.get("rss")
     when = datetime.datetime.fromtimestamp(d.get("hibernatedAt", time.time())).strftime("%H:%M")
+    w = cols(1)
     # 탭 제목. claude 가 죽으면 탭이 'zsh' 로 돌아가 어느 세션인지 모른다. 깨우면 claude 가 다시 덮어쓴다.
-    print(f"\033]0;⏾ {name}\007", end="")
+    print(f"\033]0;💤 {name}\007", end="")
     print()
-    print(f"  {MAG}💤 " + L("Asleep", "재움") + f"{R}  {BOLD}{name}{R}  {DIM}{cwd}{R}")
+    print(clip(f"  {MAG}💤 " + L("Asleep", "재움") + f"{R}  {BOLD}{name}{R}", w))
+    if prompt:
+        print(clip(f"  {DIM}" + L("last ask", "마지막 요청") + f" › {st.clean(' '.join(prompt.split()))}{R}", w))
+    home = str(Path.home())
+    print(clip(f"  {DIM}" + ("~" + cwd[len(home):] if cwd == home or cwd.startswith(home + "/") else cwd) + R, w))
+    git = ([f"{CYA}" + L("worktree", "워크트리") + f" {st.clean(wt)}{R}"] if wt else []) \
+        + ([f"{DIM}⎇ {st.clean(branch)}{R}"] if branch else [])
+    if git:
+        print(clip("  " + "  ".join(git), w))
     print(f"  {DIM}{when} · " + L(f"freed {rss}MB · conversation kept as is", f"{rss}MB 회수 · 맥락은 그대로 보존됨") + R)
     print(f"  {CYA}" + L("Press any key to pick up where you left off", "아무 키나 누르면 이어서 시작합니다") + f"{R} {DIM}"
           + L("(Ctrl-C closes the tab)", "(Ctrl-C 로 탭 종료)") + R)
@@ -683,8 +773,14 @@ def parked_list():
                 continue                            # 트랜스크립트가 없으면 되살릴 것도 없다
             out.append({**d, "hibernatedAt": d.get("seenAt"), "origin": "끊김"})
 
-    out.sort(key=lambda d: -(d.get("hibernatedAt") or 0))
-    return out
+    # 트랜스크립트가 없으면 resume 할 게 없다(계정 프로필이 새로 만들어지며 지워진 경우 등). 목록에 올리지 않는다.
+    alive = []
+    for d in out:
+        path = find_transcript(d.get("sid"), d.get("profile"))
+        if path:
+            alive.append({**d, "title": transcript_meta(path)[0]})
+    alive.sort(key=lambda d: -(d.get("hibernatedAt") or 0))
+    return alive
 
 
 def cmd_list(argv):
@@ -695,13 +791,13 @@ def cmd_list(argv):
     if not items:
         print(DIM + L("No sleeping sessions", "재운 세션 없음") + R)
         return 0
-    print(f"{'':>3} {L('from', '출처'):<5} {L('when', '언제'):<7} {'name':<15} {L('acct', '계정'):<4} cwd")
+    print(f"{'':>3} {L('from', '출처'):<5} {fit(L('when', '언제'), 12)} {fit(L('session', '세션'), 28)} {L('acct', '계정'):<4} cwd")
     print("─" * 92)
     for i, d in enumerate(items, 1):
         when = (datetime.datetime.fromtimestamp(d["hibernatedAt"]).strftime("%m-%d %H:%M")
                 if d.get("hibernatedAt") else "—")
         c = MAG if d["origin"] == "재움" else YEL
-        print(f"{i:>3} {c}{otxt(d['origin']):<5}{R} {when:<12} {st.clean(d.get('name'))[:15]:<15} "
+        print(f"{i:>3} {c}{otxt(d['origin']):<5}{R} {when:<12} {fit(label(d), 28)} "
               f"{str(d.get('account') or '-'):<4} {st.clean(d.get('cwd'))}")
     return 0
 
@@ -718,7 +814,7 @@ def cmd_pick(argv):
                 if d.get("hibernatedAt") else "—")
         c = MAG if d["origin"] == "재움" else YEL
         print(f"   {BOLD}{i}{R}) {c}{otxt(d['origin'])}{R} {DIM}{when}{R}  "
-              f"{BOLD}{st.clean(d.get('name'))[:18]}{R}  {DIM}{st.clean(d.get('cwd'))}{R}", file=E)
+              f"{BOLD}{fit(label(d), 28)}{R}  {DIM}{st.clean(d.get('cwd'))}{R}", file=E)
     print("\n  " + L("Pick a number (Enter to cancel): ", "번호 선택 (Enter 취소): "), end="", file=E, flush=True)
     try:
         s = input().strip()
@@ -760,7 +856,7 @@ def cmd_resume(argv):
     if cwd and os.path.isdir(cwd):
         os.chdir(cwd)
     acct = d.get("account")
-    print(f"{MAG}↻{R} " + L(f"restoring {d.get('name')}", f"{d.get('name')} 복원") + f" — {DIM}{cwd}{R}")
+    print(f"{MAG}↻{R} " + L(f"restoring {label(d)}", f"{label(d)} 복원") + f" — {DIM}{st.clean(cwd)}{R}")
     try:
         if acct:
             # 셸 문자열에 끼워 넣지 않고 인자로 넘긴다 (세션 ID·계정이 셸 코드로 해석되지 않게). baton 루프 안에서 이어져야
@@ -790,7 +886,7 @@ def cmd_restore(argv):
         path = argv[i + 1] if i + 1 < len(argv) else "restore-sessions.sh"
         body = "#!/bin/zsh\n# " + L("Each session needs its own tab. Run one line per tab.", "세션 하나당 탭 하나가 필요합니다. 아래를 각 탭에서 한 줄씩 실행하세요.") + "\n"
         for d, ln in zip(items, lines):
-            body += f"# {st.clean(d.get('name'))}  {st.clean(d.get('cwd'))}\n# {ln}\n"  # 줄바꿈이 명령 줄이 되지 않게
+            body += f"# {label(d)}  {st.clean(d.get('cwd'))}\n# {ln}\n"  # 줄바꿈이 명령 줄이 되지 않게
         pathlib_write = Path(path)
         pathlib_write.write_text(body)
         os.chmod(path, 0o755)
@@ -803,7 +899,7 @@ def cmd_restore(argv):
         when = (datetime.datetime.fromtimestamp(d["hibernatedAt"]).strftime("%m-%d %H:%M")
                 if d.get("hibernatedAt") else "—")
         c = MAG if d["origin"] == "재움" else YEL
-        print(f"   {c}{otxt(d['origin'])}{R} {DIM}{when}{R}  {BOLD}{st.clean(d.get('name'))[:16]:<16}{R} "
+        print(f"   {c}{otxt(d['origin'])}{R} {DIM}{when}{R}  {BOLD}{fit(label(d), 28)}{R} "
               f"{DIM}{st.clean(d.get('cwd'))}{R}")
         print(f"     {CYA}{ln}{R}\n")
     print(f"  {DIM}" + L("Open a new tab for each line and run it. Any order works.", "탭을 새로 열고 각 줄을 실행하세요. 순서는 상관없습니다.") + R)
@@ -819,6 +915,11 @@ def cmd_clean(argv):
         d = _load(f) or {}
         age = time.time() - (d.get("hibernatedAt") or d.get("dueAt", 0) - GRACE_SEC)
         if age > 3600:
+            f.unlink(missing_ok=True); n += 1
+    # 트랜스크립트가 사라진 재운 세션 마커. 되살릴 수 없으니 목록에도 안 뜨고, 여기서 치운다.
+    for f in PARKED.glob("*.json"):
+        d = _load(f) or {}
+        if not find_transcript(f.stem, d.get("profile")):
             f.unlink(missing_ok=True); n += 1
     print(L(f"cleaned {n}", f"{n}개 정리"))
     return 0

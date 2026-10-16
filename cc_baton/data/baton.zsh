@@ -6,6 +6,8 @@
 #   baton --wake          재운 세션을 골라 그 자리에서 깨운다
 # 권한 확인 건너뛰기(--dangerously-skip-permissions)는 사용자가 켰을 때만 (cc-baton toggle bypass on|off, 한 번만 끄기: CC_NO_BYPASS=1).
 # 세션 안에서 /swap 을 쓰면 마커가 남고, claude 종료 시 이 루프가 대화를 이관해 재개한다.
+# 입력창에 쓰다 만 글은 mods/draft 가 세션별로 적어 두었다가 깨울 때 되채운다 (재우기는 SIGTERM 이라 그냥 두면 날아간다).
+typeset -g _CC_BATON_MODS="${${(%):-%x}:A:h}/mods"
 baton() {
   local b="${CC_BATON_BIN:-cc-baton}"
   local marker="${XDG_STATE_HOME:-$HOME/.local/state}/cc-baton/request-$$.json"   # 이 탭 전용 /swap 예약
@@ -44,9 +46,9 @@ baton() {
     "$b" hib cap $$ 2>/dev/null
     "$b" claude-update
     if (( ${#args} + ${#bypass} )); then
-      CC_SWAP_LOOP=1 CC_BATON_TAB=$$ env -u CLAUDE_CONFIG_DIR "$b" cswap run "$target" -- "${bypass[@]}" "${args[@]}"
+      CC_SWAP_LOOP=1 CC_BATON_TAB=$$ CLAUDE_CODE_PLUGIN_DIRS="${CLAUDE_CODE_PLUGIN_DIRS:+$CLAUDE_CODE_PLUGIN_DIRS:}$_CC_BATON_MODS/draft" env -u CLAUDE_CONFIG_DIR "$b" cswap run "$target" -- "${bypass[@]}" "${args[@]}"
     else
-      CC_SWAP_LOOP=1 CC_BATON_TAB=$$ env -u CLAUDE_CONFIG_DIR "$b" cswap run "$target"
+      CC_SWAP_LOOP=1 CC_BATON_TAB=$$ CLAUDE_CODE_PLUGIN_DIRS="${CLAUDE_CODE_PLUGIN_DIRS:+$CLAUDE_CODE_PLUGIN_DIRS:}$_CC_BATON_MODS/draft" env -u CLAUDE_CONFIG_DIR "$b" cswap run "$target"
     fi
     rc=$?
 

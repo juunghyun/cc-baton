@@ -3,3 +3,6 @@ __pycache__/
 .DS_Store
 .pytest_cache/
 .venv/
+# 세션이 띄우는 mod 폴더에 엔진이 타입 파일과 그걸 가리키는 tsconfig 를 깐다
+cc_baton/data/mods/*/.claude-plugin/types/
+cc_baton/data/mods/*/tsconfig.json

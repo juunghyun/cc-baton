@@ -482,6 +482,14 @@ def cmd_tick(argv):
         d = _load(f) or {}
         if time.time() - d.get("hibernatedAt", 0) > REQ_TTL:
             f.unlink(missing_ok=True)
+    # 비워진 입력창 초안 (mods/draft 가 제출 때 비운다). 하루 묵은 것만 — 지금 쓰이는 파일과 엇갈리지 않게.
+    for f in (st.STATE_DIR / "drafts").glob("*.txt"):
+        try:
+            s = f.stat()
+        except OSError:
+            continue
+        if s.st_size == 0 and time.time() - s.st_mtime > 86400:
+            f.unlink(missing_ok=True)
 
     for a in acted:
         print(a)

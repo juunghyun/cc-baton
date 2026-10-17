@@ -356,6 +356,8 @@ FEATURE_DEFAULTS = {
     "usageRefresh": {"enabled": False},
     # baton 이 Claude Code 를 --dangerously-skip-permissions 로 띄울지. 권한 확인이 사라지므로 사용자가 켤 때만.
     "skipPermissions": {"enabled": False},
+    # Claude Code 의 프롬프트 추천(입력창에 흐리게 뜨는 다음 할 말). Claude Code 기본값을 따라 켜져 있다.
+    "promptSuggest": {"enabled": True},
 }
 UPDATE_FAILED = STATE_DIR / "update-failed"  # claude-update 가 설치 실패 시 남긴다
 HIB_LABEL = "io.github.juunghyun.cc-baton.hib"  # hib tick 을 돌리는 launchd 에이전트

@@ -83,3 +83,9 @@ def test_update_check_uses_the_cached_latest_version(home):
     (home.state / "claude-latest").write_text("1.0.0\n")  # 30분 안에 확인한 최신 버전
     assert home.run("claude-update", NPM_PREFIX=prefix).returncode == 0
     assert not (home.root / "curl-called").exists()  # 레지스트리에 다시 묻지 않는다
+
+
+def test_suggest_defaults_on_and_toggles(home):
+    assert home.run("toggle", "is-on", "suggest").returncode == 0  # Claude Code 기본값처럼 켜짐
+    assert home.run("toggle", "suggest", "off").returncode == 0
+    assert home.run("toggle", "is-on", "suggest").returncode == 1

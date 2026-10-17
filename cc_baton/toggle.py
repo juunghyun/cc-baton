@@ -9,25 +9,27 @@ from . import state as st
 from .i18n import L
 
 USAGE_EN = """cc-baton toggle                          show switches
-cc-baton toggle update|sleep|autoswap|usage|bypass on|off   turn one on or off
+cc-baton toggle update|sleep|autoswap|usage|bypass|suggest on|off   turn one on or off
 cc-baton toggle is-on <name>             for scripts (exit 0 = on)
 
   update  update Claude Code before each launch and swap (npm install only)
   sleep   put idle sessions to sleep automatically (manual /sleep always works)
   autoswap prepare a swap to another of your accounts when one hits its usage limit
   usage   keep usage numbers fresh (claude-swap asks Anthropic's usage endpoint per account)
-  bypass  start sessions with --dangerously-skip-permissions (Claude runs commands without asking)"""
+  bypass  start sessions with --dangerously-skip-permissions (Claude runs commands without asking)
+  suggest Claude Code's prompt suggestions (the dim next prompt in the input box), from the next launch"""
 USAGE_KO = """cc-baton toggle                          현황
-cc-baton toggle update|sleep|autoswap|usage|bypass on|off   켜기/끄기
+cc-baton toggle update|sleep|autoswap|usage|bypass|suggest on|off   켜기/끄기
 cc-baton toggle is-on <이름>             스크립트용 (exit 0 = 켜짐)
 
   update  실행·스왑 직전 Claude Code 최신화 (npm 설치본만)
   sleep   유휴 세션 자동 재우기 (/sleep 수동 재우기는 끄지 않는다)
   autoswap 한도에 걸린 계정이 있으면 다른 내 계정으로 스왑을 준비
   usage   사용량 숫자를 최신으로 (claude-swap 이 계정마다 Anthropic 사용량 API 를 조회)
-  bypass  --dangerously-skip-permissions 로 세션 시작 (Claude 가 묻지 않고 명령 실행)"""
+  bypass  --dangerously-skip-permissions 로 세션 시작 (Claude 가 묻지 않고 명령 실행)
+  suggest Claude Code 프롬프트 추천 (입력창에 흐리게 뜨는 다음 할 말), 다음 실행부터"""
 
-KEYS = {"update": "autoUpdate", "hib": "hibernate", "swap": "onLimit", "usage": "usageRefresh", "bypass": "skipPermissions"}
+KEYS = {"update": "autoUpdate", "hib": "hibernate", "swap": "onLimit", "usage": "usageRefresh", "bypass": "skipPermissions", "suggest": "promptSuggest"}
 
 
 def set_enabled(key, on):

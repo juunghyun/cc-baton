@@ -22,7 +22,7 @@ Your team seat and your personal plan are separate Claude accounts, and a conver
 
 ```sh
 command -v uv >/dev/null || { curl -LsSf https://astral.sh/uv/install.sh | sh && . "$HOME/.local/bin/env"; }
-uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton@v0.1.4 && ~/.local/bin/cc-baton install
+uv tool install --python 3.12 git+https://github.com/juunghyun/cc-baton@v0.1.5 && ~/.local/bin/cc-baton install
 ```
 
 Open a new terminal and run **`baton`** (a zsh function; macOS uses zsh by default). From now on, start Claude Code with `baton` instead of `claude`. The first run asks a few questions (language, account groups and short names, HUD, sleep, auto-swap, usage refresh, permission prompts), then shows the account picker. Accounts live in [claude-swap](https://github.com/realiti4/claude-swap), which comes bundled: log in to Claude Code and run `cswap add` for each account. With a single account you still get the HUD and sleep.
@@ -58,7 +58,7 @@ Run exactly the two lines above. Don't edit `~/.claude/settings.json` or `~/.zsh
 | `/swap <account>` | Move this conversation to another account (number, short name or email), then press Ctrl+D |
 | `/sleep` | Put this session to sleep now |
 | `baton --wake` | Bring back a sleeping session |
-| `cc-baton toggle update\|sleep\|autoswap\|usage\|bypass on\|off` | Turn a feature on or off |
+| `cc-baton toggle update\|sleep\|autoswap\|usage\|bypass\|suggest on\|off` | Turn a feature on or off |
 | `cc-baton setup` · `lang en\|ko` · `upgrade` | Setup again · display language · update cc-baton |
 
 Claude Code shows `/swap` as "blocked by hook": that's expected, the command is handled before it reaches the model. If one Ctrl+D doesn't exit, press it again. Rename an account's short name any time with `cswap alias <number> <name>`.

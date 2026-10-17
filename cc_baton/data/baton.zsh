@@ -12,7 +12,7 @@ baton() {
   local b="${CC_BATON_BIN:-cc-baton}"
   local marker="${XDG_STATE_HOME:-$HOME/.local/state}/cc-baton/request-$$.json"   # 이 탭 전용 /swap 예약
   local target="" sid="" out rc hsid rest wcwd
-  local -a args=() bypass=()
+  local -a args=() bypass=() nosug=()
 
   "$b" setup --if-needed || return 1
 
@@ -45,10 +45,12 @@ baton() {
   while true; do
     "$b" hib cap $$ 2>/dev/null
     "$b" claude-update
+    # 프롬프트 추천은 Claude Code 설정이 계정(설정 폴더)마다 따로라, 모든 계정에 한 번에 먹는 환경변수로 끈다.
+    nosug=(); "$b" toggle is-on suggest || nosug=(CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false)
     if (( ${#args} + ${#bypass} )); then
-      CC_SWAP_LOOP=1 CC_BATON_TAB=$$ CLAUDE_CODE_PLUGIN_DIRS="${CLAUDE_CODE_PLUGIN_DIRS:+$CLAUDE_CODE_PLUGIN_DIRS:}$_CC_BATON_MODS/draft" env -u CLAUDE_CONFIG_DIR "$b" cswap run "$target" -- "${bypass[@]}" "${args[@]}"
+      CC_SWAP_LOOP=1 CC_BATON_TAB=$$ CLAUDE_CODE_PLUGIN_DIRS="${CLAUDE_CODE_PLUGIN_DIRS:+$CLAUDE_CODE_PLUGIN_DIRS:}$_CC_BATON_MODS/draft" env -u CLAUDE_CONFIG_DIR "${nosug[@]}" "$b" cswap run "$target" -- "${bypass[@]}" "${args[@]}"
     else
-      CC_SWAP_LOOP=1 CC_BATON_TAB=$$ CLAUDE_CODE_PLUGIN_DIRS="${CLAUDE_CODE_PLUGIN_DIRS:+$CLAUDE_CODE_PLUGIN_DIRS:}$_CC_BATON_MODS/draft" env -u CLAUDE_CONFIG_DIR "$b" cswap run "$target"
+      CC_SWAP_LOOP=1 CC_BATON_TAB=$$ CLAUDE_CODE_PLUGIN_DIRS="${CLAUDE_CODE_PLUGIN_DIRS:+$CLAUDE_CODE_PLUGIN_DIRS:}$_CC_BATON_MODS/draft" env -u CLAUDE_CONFIG_DIR "${nosug[@]}" "$b" cswap run "$target"
     fi
     rc=$?
 

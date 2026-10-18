@@ -1,31 +1,140 @@
-// ccswap: claude-swap(cswap) 의 Go 판. 지금은 읽기 전용 list/status --json 만 있다.
+// ccswap: claude-swap(cswap) 의 Go 판. 지금은 list/status --json, alias, map, unmap 이 있다.
 package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/juunghyun/cc-baton/go/internal/swap"
 )
 
+const usage = `usage:
+  ccswap list --json | status --json
+  ccswap alias [NUM|EMAIL|ALIAS NAME | NUM|EMAIL|ALIAS --unset]
+  ccswap map [NUM|EMAIL|ALIAS [PATH]]
+  ccswap unmap [PATH]`
+
 func main() {
 	os.Exit(run(os.Args[1:]))
 }
 
 func run(args []string) int {
-	if len(args) != 2 || args[1] != "--json" || (args[0] != "list" && args[0] != "status") {
-		fmt.Fprintln(os.Stderr, "usage: ccswap list --json | ccswap status --json")
-		return 2
-	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	env := swap.Env{Home: home}
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, usage)
+		return 2
+	}
+	cmd, rest := args[0], args[1:]
+	switch cmd {
+	case "list", "status":
+		return jsonCmd(env, cmd, rest)
+	case "alias", "map", "unmap":
+		if os.Geteuid() == 0 {
+			return fail(errors.New("do not run this as root"))
+		}
+	}
+	switch {
+	case cmd == "alias" && len(rest) == 0:
+		rows, err := env.Aliases()
+		if err != nil {
+			return fail(err)
+		}
+		if len(rows) == 0 {
+			fmt.Println("No aliases set")
+		}
+		for _, r := range rows {
+			fmt.Printf("  %s: %s (%s)\n", r.Num, r.Alias, r.Email)
+		}
+	case cmd == "alias" && len(rest) == 2 && (rest[0] == "--unset" || rest[1] == "--unset"):
+		id := rest[0]
+		if id == "--unset" {
+			id = rest[1]
+		}
+		num, err := env.UnsetAlias(id)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Printf("Removed alias for Account %s\n", num)
+	case cmd == "alias" && len(rest) == 2:
+		num, norm, err := env.SetAlias(rest[0], rest[1])
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Printf("Set alias '%s' for Account %s\n", norm, num)
+	case cmd == "map" && len(rest) == 0:
+		rows, err := env.Mappings()
+		if err != nil {
+			return fail(err)
+		}
+		if len(rows) == 0 {
+			fmt.Println("No directory mappings yet.\nMap one with: ccswap map <NUM|EMAIL> [PATH]")
+		}
+		for _, r := range rows {
+			if r.Slot != "" {
+				fmt.Printf("  %s → %s: %s\n", r.Path, r.Slot, r.Email)
+			} else {
+				fmt.Printf("  %s → %s (account removed)\n", r.Path, r.Email)
+			}
+		}
+	case cmd == "map" && len(rest) <= 2:
+		target := cwdOr(rest[1:])
+		if st, err := os.Stat(target); err != nil || !st.IsDir() {
+			fmt.Fprintf(os.Stderr, "Warning: %s is not an existing directory (mapping it anyway)\n", target)
+		}
+		num, email, key, prev, err := env.Map(rest[0], target)
+		if err != nil {
+			return fail(err)
+		}
+		if prev != "" && prev != email {
+			fmt.Printf("Mapped %s → Account-%s (%s) (was %s)\n", key, num, email, prev)
+		} else {
+			fmt.Printf("Mapped %s → Account-%s (%s)\n", key, num, email)
+		}
+	case cmd == "unmap" && len(rest) <= 1:
+		key, removed, err := env.Unmap(cwdOr(rest))
+		if err != nil {
+			return fail(err)
+		}
+		if removed {
+			fmt.Printf("Unmapped %s\n", key)
+		} else {
+			fmt.Printf("No mapping for %s\n", key)
+		}
+	default:
+		fmt.Fprintln(os.Stderr, usage)
+		return 2
+	}
+	return 0
+}
+
+func cwdOr(args []string) string {
+	if len(args) > 0 {
+		return args[0]
+	}
+	wd, _ := os.Getwd()
+	return wd
+}
+
+func fail(err error) int {
+	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	return 1
+}
+
+func jsonCmd(env swap.Env, cmd string, rest []string) int {
+	if len(rest) != 1 || rest[0] != "--json" {
+		fmt.Fprintln(os.Stderr, usage)
+		return 2
+	}
 	var out map[string]any
-	if args[0] == "list" {
+	var err error
+	if cmd == "list" {
 		out, err = env.ListJSON()
 	} else {
 		out, err = env.StatusJSON()

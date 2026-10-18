@@ -443,3 +443,22 @@ pace = {"expectedPct", "aheadOfPace", "projectedExhaustionAt"?, "willLastToReset
 7. 계정 2에 세션 프로필이 생기는 경로(계정 1을 기본 로그인으로 /login 전환)를 v1에서 지원할 것인가? 그 경우 활성 판정이 바뀌는 순간 §3.4.2/§3.5 경계 사례(stale config 아래의 다른 계정 크리덴셜)가 생긴다.
 8. `CLAUDE_SECURESTORAGE_CONFIG_DIR`를 쓸 일이 있는가? 없다면 "정의돼 있으면 거부"만 구현하면 된다.
 9. Python `.prev` 보관이 Keychain에 `account-N-email.prev` 항목을 남기는데, 현재 존재 여부는 확인하지 않았다(Keychain 조회 금지). remove 시 함께 지워야 한다.
+
+---
+
+## 8. 포팅 결정 (2026-10-14, 사용자 인터뷰)
+
+| 항목 | 결정 |
+|---|---|
+| 키체인 토큰 백업 | 하지 않는다. refresh token 은 1회용이라 되돌리면 R1 이 된다. 실제 데이터 쓰기 전 파일(`sessions/` 제외 + 프로필 `.claude.json`)만 백업. 로그아웃 복구는 `/login` 후 계정 재추가 |
+| 쉬는 계정 refresh (consume gate, §3.4.1) | v1 에 넣는다. 가장 위험하므로 마지막 단계(3f) |
+| 활성 계정 refresh (§3.4.2) | 넣지 않는다. Claude Code 가 한다(R5 권고) |
+| run 직전 pre-lock refresh | 넣지 않는다(R12) |
+| 실제 데이터 테스트 | 단계(3a~3f)마다. 테스트 때 백업 → `usageRefresh` 끔 → Go 명령 수동 실행 |
+| pick.py CLAUDE_CONFIG_DIR | Python 쪽은 고치지 않는다. Go 는 이 env 를 보지 않으므로 전환하면 사라진다 |
+| 명령 이름 | 최종은 Go `cc-baton` 바이너리 하나 + `cswap` 링크(같은 바이너리) |
+| 로그 | `claude-swap.log` 에 같은 형식으로 이어 쓰고 메시지 앞에 `[go]` |
+| baton 전환 | 3단계 전체가 실제 데이터로 검증된 뒤 cswap 자리를 한 번에 Go 로 바꾼다. 그전까지 baton·statusline 은 Python cswap |
+
+단계: 3a alias·map/unmap → 3b usage 수집(refresh 없음) → 3c 활성 resync·프로필 채택 → 3d run → 3e add·add-token·remove → 3f 쉬는 계정 refresh.
+공통 규칙: Python 과 같은 flock 파일(`.lock`, `credentials/.consume-N.lock`, `cache/.usage.lock`), 프로필 삭제·재seed 전 quiescent 확인(Python 보다 엄격, R2).

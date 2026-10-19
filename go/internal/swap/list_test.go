@@ -4,6 +4,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,7 +39,17 @@ func newHome(t *testing.T) *fakeHome {
 	t.Cleanup(func() { securityBin = old })
 	t.Setenv("FAKE_KC", h.kc)
 	t.Setenv("USER", h.user)
+	// 진짜 API 로 나가지 않게 가짜 서버를 둔다. 기본은 503(받기 실패), 테스트가 h.serve 로 바꾼다.
+	h.serve(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) })
 	return h
+}
+
+func (h *fakeHome) serve(fn http.HandlerFunc) {
+	srv := httptest.NewServer(fn)
+	h.t.Cleanup(srv.Close)
+	old := usageURL
+	usageURL = srv.URL
+	h.t.Cleanup(func() { usageURL = old })
 }
 
 func must(t *testing.T, err error) {
@@ -106,7 +118,8 @@ func TestListMarksActiveAndServesOnlyTrustedUsage(t *testing.T) {
 	h.twoAccounts()
 	h.json(".claude-swap-backup/cache/usage.json", map[string]any{"schemaVersion": 2, "accounts": map[string]any{
 		"2": usageRow("b@corp.com", "org2", 10, nil),
-		"1": usageRow("a@gmail.com", "", 1000, map[string]any{"nextPollAt": 0.0}), // 300초 넘었고 신뢰 연장 사유 없음
+		// 300초 넘었고 신뢰 연장 사유 없음. 백오프 중이라 이번엔 받지도 않는다
+		"1": usageRow("a@gmail.com", "", 1000, map[string]any{"nextPollAt": 0.0, "backoffUntil": float64(time.Now().Unix() + 600)}),
 	}})
 	p, err := h.env.ListJSON()
 	must(t, err)
@@ -165,15 +178,20 @@ func TestBackupReadStatuses(t *testing.T) {
 func TestDeadTokenStrikeBindsToItsGeneration(t *testing.T) {
 	h := newHome(t)
 	h.twoAccounts()
-	for struck, want := range map[string]string{
-		fingerprint(creds("bk", "rt-1", later)): "relogin_required",
-		"sha256:" + strings.Repeat("0", 64):     "unavailable", // 그새 다른 세대로 바뀌었으면 격리가 풀린다
+	for struck, dead := range map[string]bool{
+		fingerprint(creds("bk", "rt-1", later)): true,
+		"sha256:" + strings.Repeat("0", 64):     false, // 그새 다른 세대로 바뀌었으면 격리가 풀린다
 	} {
 		h.json(".claude-swap-backup/cache/usage.json", map[string]any{"schemaVersion": 2, "accounts": map[string]any{
 			"1": usageRow("a@gmail.com", "", 1000, map[string]any{"authDeadStrikes": 1, "struckFingerprint": struck})}})
 		p, _ := h.env.ListJSON()
-		if s := accountsByNum(t, p)[1]["usageStatus"]; s != want {
-			t.Fatalf("struck %s… = %v, want %v", struck[:12], s, want)
+		s := accountsByNum(t, p)[1]["usageStatus"]
+		row := readJSONMap(h.env.usagePath())["accounts"].(map[string]any)["1"].(map[string]any)
+		if dead && (s != "relogin_required" || row["authDeadStrikes"] != 1.0) {
+			t.Fatalf("격리가 풀림: %v %v", s, row["authDeadStrikes"])
+		}
+		if !dead && (s == "relogin_required" || row["authDeadStrikes"] != 0.0 || row["struckFingerprint"] != nil) {
+			t.Fatalf("격리가 안 풀림: %v %v", s, row)
 		}
 	}
 }
@@ -212,16 +230,20 @@ func TestStatus(t *testing.T) {
 	}
 }
 
-// 이 단계의 약속: 실제 데이터를 읽기만 한다.
-func TestListAndStatusWriteNothing(t *testing.T) {
+// list/status 가 쓰는 건 사용량 캐시와 그 잠금 파일뿐이다. 계정 목록·매핑·키체인은 그대로여야 한다.
+func TestListAndStatusWriteOnlyUsageCache(t *testing.T) {
 	h := newHome(t)
 	h.twoAccounts()
 	h.json(".claude-swap-backup/cache/usage.json", map[string]any{"schemaVersion": 2, "accounts": map[string]any{
 		"2": usageRow("b@corp.com", "org2", 10, map[string]any{"authDeadStrikes": 1, "struckFingerprint": "sha256:x"})}})
+	cache := filepath.Join(h.env.Backup(), "cache")
 	snap := func() map[string]string {
 		m := map[string]string{}
 		for _, root := range []string{h.env.Home, h.kc} {
 			filepath.WalkDir(root, func(p string, d fs.DirEntry, _ error) error {
+				if d.IsDir() || filepath.Dir(p) == cache || filepath.Base(p) == "claude-swap.log" {
+					return nil // 폴더 시각은 로그 파일이 생기면 바뀐다
+				}
 				info, _ := d.Info()
 				b, _ := os.ReadFile(p)
 				m[p] = info.ModTime().String() + info.Mode().String() + string(b)
@@ -234,8 +256,14 @@ func TestListAndStatusWriteNothing(t *testing.T) {
 	h.env.ListJSON()
 	h.env.StatusJSON()
 	after := snap()
-	if len(before) != len(after) {
-		t.Fatalf("파일 수가 바뀜 %d → %d", len(before), len(after))
+	for p := range after {
+		if _, ok := before[p]; !ok {
+			t.Fatalf("새 파일: %s", p)
+		}
+	}
+	// 받기 실패(가짜 서버 503)는 claude-swap 과 같은 로그 파일에 [go] 표시로 남는다
+	if b, _ := os.ReadFile(filepath.Join(h.env.Backup(), "claude-swap.log")); !strings.Contains(string(b), " - WARNING - [go] Usage fetch failed for account 1: http-503") { // 2번은 10초 전에 받아서 아직 차례가 아니다
+		t.Fatalf("로그 = %q", b)
 	}
 	for p, v := range before {
 		if after[p] != v {

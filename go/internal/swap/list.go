@@ -106,7 +106,6 @@ func (e Env) accountsInfo(s *sequence) []accountInfo {
 
 // statuses 는 네트워크 없이 정할 수 있는 상태만 정한다(api_key, no_credentials, keychain_unavailable,
 // relogin_required, token_expired). 나머지는 캐시 판정을 따른다.
-// shortcut: 읽기 전용이라 사용량을 새로 받지 않는다. cswap 이 막 갱신한 캐시를 그대로 읽는 것과 같다.
 func (e Env) statuses(infos []accountInfo) (map[string]string, map[string]entry) {
 	ids := map[string][2]string{}
 	for _, i := range infos {
@@ -132,6 +131,28 @@ func (e Env) statuses(infos []accountInfo) (map[string]string, map[string]entry)
 		}
 	}
 	return st, entries
+}
+
+// collectAll 은 claude-swap 의 수집 한 번과 같다: 상태 판정 → 풀린 격리 정리 → 받을 차례인 계정 받기 → 다시 읽기.
+func (e Env) collectAll(infos []accountInfo) (map[string]string, map[string]entry) {
+	st, entries := e.statuses(infos)
+	ids := map[string][2]string{}
+	for _, i := range infos {
+		ids[strconv.Itoa(i.num)] = [2]string{i.email, i.orgUUID}
+	}
+	healed := false
+	for n, en := range entries {
+		// strike 는 있는데 지금 저장된 세대를 가리키지 않는다(relogin_required 나 정적 센티널이 아니면 그 경우다)
+		if (st[n] == "" || st[n] == "token_expired") && en.strikes >= authDeadStrikes {
+			e.clearDeadToken(n, ids[n])
+			healed = true
+		}
+	}
+	if healed {
+		entries = e.usageEntries(ids)
+	}
+	e.collect(infos, st, ids, entries)
+	return st, e.usageEntries(ids)
 }
 
 // tokenDead: 활성 계정은 라이브와 백업 두 곳 중 하나라도 죽은 세대를 들고 있으면 죽은 것으로 본다.
@@ -225,7 +246,7 @@ func (e Env) ListJSON() (map[string]any, error) {
 		return payload, nil
 	}
 	infos := e.accountsInfo(s)
-	st, entries := e.statuses(infos)
+	st, entries := e.collectAll(infos)
 	accounts := []any{}
 	for _, i := range infos {
 		k := strconv.Itoa(i.num)
@@ -268,7 +289,7 @@ func (e Env) StatusJSON() (map[string]any, error) {
 	n, _ := strconv.Atoi(k)
 	i := accountInfo{num: n, email: email, orgUUID: str(a, "organizationUuid"), active: true}
 	i.creds, i.unreadable = e.readActive()
-	st, entries := e.statuses([]accountInfo{i})
+	st, entries := e.collectAll([]accountInfo{i})
 	active := map[string]any{"number": n, "email": email, "organizationName": str(a, "organizationName"),
 		"organizationUuid": i.orgUUID, "isOrganization": i.orgUUID != "", "managed": true}
 	usageFields(active, st[k], entries[k])

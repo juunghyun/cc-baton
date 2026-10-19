@@ -26,6 +26,9 @@ type entry struct {
 	trustExtended bool
 	claimUntil    *float64
 	lastAttemptAt *float64
+	// 호출 간격 계획(plan)에 쓰는 값
+	pollIntervalS, last429At, backoffUntil *float64
+	lastError                              string
 }
 
 func num(v any) *float64 {
@@ -74,6 +77,8 @@ func (e Env) usageEntries(ids map[string][2]string) map[string]entry {
 			en.strikes = int(*s)
 		}
 		en.struckFP, _ = row["struckFingerprint"].(string)
+		en.pollIntervalS, en.last429At, en.backoffUntil = num(row["pollIntervalS"]), num(row["last429At"]), num(row["backoffUntil"])
+		en.lastError, _ = row["lastError"].(string)
 		var within bool
 		if row["lastError"] == "http-429" {
 			within = rateLimitedTrustOK(en.lastGood, en.ageS, now)

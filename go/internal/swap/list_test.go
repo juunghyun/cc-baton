@@ -13,11 +13,19 @@ import (
 	"time"
 )
 
-// 가짜 security: $FAKE_KC/<service>@<account> 파일이 비밀값. 없으면 44, LOCKED 파일이 있으면 잠김(51).
+// 가짜 security: $FAKE_KC/<service>@<account> 파일이 비밀값. 없으면 44, LOCKED 가 있으면 잠김(51), READONLY 면 쓰기 실패.
+// `security -i` 는 표준입력 한 줄을 셸처럼 다시 나눠 같은 명령으로 처리한다.
 const fakeSecurity = `#!/bin/sh
 [ -e "$FAKE_KC/LOCKED" ] && exit 51
-while [ $# -gt 0 ]; do case "$1" in -a) a="$2"; shift;; -s) s="$2"; shift;; esac; shift; done
-f="$FAKE_KC/$s@$a"; [ -f "$f" ] || exit 44; cat "$f"; echo
+if [ "$1" = "-i" ]; then read -r line; eval "set -- $line"; fi
+cmd=$1; shift
+while [ $# -gt 0 ]; do case "$1" in -a) a="$2"; shift;; -s) s="$2"; shift;; -X) x="$2"; shift;; esac; shift; done
+f="$FAKE_KC/$s@$a"
+case "$cmd" in
+  find-generic-password) [ -f "$f" ] || exit 44; cat "$f"; echo;;
+  add-generic-password) [ -e "$FAKE_KC/READONLY" ] && exit 1; printf '%s' "$x" | xxd -r -p > "$f";;
+  delete-generic-password) [ -f "$f" ] || exit 44; rm "$f";;
+esac
 `
 
 type fakeHome struct {
@@ -41,7 +49,17 @@ func newHome(t *testing.T) *fakeHome {
 	t.Setenv("USER", h.user)
 	// 진짜 API 로 나가지 않게 가짜 서버를 둔다. 기본은 503(받기 실패), 테스트가 h.serve 로 바꾼다.
 	h.serve(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) })
+	h.profile(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) })
 	return h
+}
+
+// profile 은 소유권 확인 API(/api/oauth/profile) 자리에 가짜 서버를 둔다.
+func (h *fakeHome) profile(fn http.HandlerFunc) {
+	srv := httptest.NewServer(fn)
+	h.t.Cleanup(srv.Close)
+	old := profileURL
+	profileURL = srv.URL
+	h.t.Cleanup(func() { profileURL = old })
 }
 
 func (h *fakeHome) serve(fn http.HandlerFunc) {

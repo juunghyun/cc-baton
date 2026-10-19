@@ -70,13 +70,15 @@ func (e Env) readBackup(num, email string) (value string, unreadable bool) {
 
 // readActive 는 Claude Code 의 기본 프로필 로그인 정보를 읽는다.
 // 키체인 → ~/.claude/.credentials.json → 관리형 API 키 순서. unreadable 은 키체인이 실패했고 다른 데서도 못 메웠다는 뜻.
-func (e Env) readActive() (value string, unreadable bool) {
+// degraded 는 키체인을 못 읽어 평문 파일로 메웠다는 뜻이다. CC 는 회전을 키체인에만 쓰므로 그 값은 옛 세대일 수 있다:
+// 그 refresh token 은 절대 소비하거나 백업에 쓰지 않는다.
+func (e Env) readActive() (value string, unreadable, degraded bool) {
 	failed := false
 	for i := 0; i < 2; i++ {
 		v, err := kcGet(liveService, kcAccount())
 		if err == nil {
 			if v != "" {
-				return v, false
+				return v, false, false
 			}
 			failed = false
 			break
@@ -89,21 +91,21 @@ func (e Env) readActive() (value string, unreadable bool) {
 	if p := filepath.Join(e.Home, ".claude", ".credentials.json"); exists(p) {
 		b, err := os.ReadFile(p)
 		if err != nil {
-			return "", failed
+			return "", failed, false
 		}
 		if strings.TrimSpace(string(b)) != "" {
-			return string(b), false
+			return string(b), false, failed
 		}
 	}
 	if v, err := kcGet(managedService, kcAccount()); err == nil && v != "" {
-		return v, false
+		return v, false, failed
 	}
 	if cfg := readJSONMap(e.GlobalConfig()); cfg != nil {
 		if k, ok := cfg["primaryApiKey"].(string); ok && k != "" {
-			return k, false
+			return k, false, failed
 		}
 	}
-	return "", failed
+	return "", failed, false
 }
 
 func oauthData(creds string) map[string]any {

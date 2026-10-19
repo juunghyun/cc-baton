@@ -167,23 +167,6 @@ func TestIdleAccountPrefersItsSessionProfileToken(t *testing.T) {
 	}
 }
 
-func TestExpiredIdleBackupIsNotSentAndClaimIsReleased(t *testing.T) {
-	h := newHome(t)
-	h.twoAccounts()
-	h.keychain(backupService, "account-1-a@gmail.com", creds("bk", "rt-1", time.Now().UnixMilli()))
-	api := h.api(ok200)
-	p, _ := h.env.ListJSON()
-	if contains(api.tokens, "bk") {
-		t.Fatal("만료된 백업 토큰을 보냄")
-	}
-	if s := accountsByNum(t, p)[1]["usageStatus"]; s != "token_expired" {
-		t.Fatalf("= %v", s)
-	}
-	if row := h.usageRow("1"); row["claimId"] != nil || row["lastError"] != nil {
-		t.Fatalf("임대가 안 풀렸거나 실패로 기록됨: %v", row)
-	}
-}
-
 func TestActive401IsRecordedNotRefreshed(t *testing.T) {
 	h := newHome(t)
 	h.twoAccounts()

@@ -282,6 +282,7 @@ func (e Env) AddToken(tok, email string) (num string, updated bool, err error) {
 }
 
 // RemoveTarget 은 지울 계정을 찾고, 그 프로필에서 claude 가 돌고 있으면(또는 확실히 모르면) 거부한다. 확인 질문 전에 부른다.
+// shortcut: 같은 이메일이 여러 조직 계정에 있으면 Python 은 번호를 묻지만 여기선 "번호로 지정하라"는 에러를 낸다. 그런 계정을 쓰게 되면 선택 질문 추가.
 func (e Env) RemoveTarget(id string) (num, email string, err error) {
 	m, err := e.loadSequenceRaw()
 	if err != nil {

@@ -50,7 +50,17 @@ func newHome(t *testing.T) *fakeHome {
 	// 진짜 API 로 나가지 않게 가짜 서버를 둔다. 기본은 503(받기 실패), 테스트가 h.serve 로 바꾼다.
 	h.serve(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) })
 	h.profile(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) })
+	h.token(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }) // 진짜 토큰 갱신 API 는 절대 부르지 않는다
 	return h
+}
+
+// token 은 토큰 갱신 API(platform.claude.com/v1/oauth/token) 자리에 가짜 서버를 둔다.
+func (h *fakeHome) token(fn http.HandlerFunc) {
+	srv := httptest.NewServer(fn)
+	h.t.Cleanup(srv.Close)
+	old := tokenURL
+	tokenURL = srv.URL
+	h.t.Cleanup(func() { tokenURL = old })
 }
 
 // profile 은 소유권 확인 API(/api/oauth/profile) 자리에 가짜 서버를 둔다.

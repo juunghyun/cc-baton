@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
+	"syscall"
 
 	"github.com/juunghyun/cc-baton/go/internal/swap"
 )
@@ -14,7 +16,8 @@ const usage = `usage:
   ccswap list --json | status --json
   ccswap alias [NUM|EMAIL|ALIAS NAME | NUM|EMAIL|ALIAS --unset]
   ccswap map [NUM|EMAIL|ALIAS [PATH]]
-  ccswap unmap [PATH]`
+  ccswap unmap [PATH]
+  ccswap run NUM|EMAIL|ALIAS [--no-share] [-- CLAUDE_ARGS...]`
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -35,6 +38,8 @@ func run(args []string) int {
 	switch cmd {
 	case "list", "status":
 		return jsonCmd(env, cmd, rest)
+	case "run":
+		return runCmd(env, rest)
 	case "alias", "map", "unmap":
 		if os.Geteuid() == 0 {
 			return fail(errors.New("do not run this as root"))
@@ -153,4 +158,41 @@ func jsonCmd(env swap.Env, cmd string, rest []string) int {
 	enc.SetIndent("", "  ")
 	enc.Encode(out)
 	return code
+}
+
+// runCmd 는 claude 로 프로세스를 바꾼다(돌아오지 않는다). baton.zsh 가 `cswap run <계정> [-- 인자]` 로 부른다.
+func runCmd(env swap.Env, args []string) int {
+	if os.Geteuid() == 0 {
+		return fail(errors.New("do not run this as root"))
+	}
+	var head, tail []string
+	head = args
+	for i, a := range args {
+		if a == "--" {
+			head, tail = args[:i], args[i+1:]
+			break
+		}
+	}
+	share, id := true, ""
+	for _, a := range head {
+		switch {
+		case a == "--no-share":
+			share = false
+		case id == "" && !strings.HasPrefix(a, "-"):
+			id = a
+		default:
+			fmt.Fprintln(os.Stderr, usage)
+			return 2
+		}
+	}
+	if id == "" {
+		fmt.Fprintln(os.Stderr, usage)
+		return 2
+	}
+	l, err := env.PrepareRun(id, tail, share)
+	if err != nil {
+		return fail(err)
+	}
+	fmt.Println(l.Note)
+	return fail(syscall.Exec(l.Bin, l.Argv, l.Env)) // 성공하면 여기 오지 않는다
 }

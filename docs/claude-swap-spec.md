@@ -104,6 +104,7 @@ setup-token: `{"claudeAiOauth":{"accessToken":tok,"scopes":["user:inference"]}}`
 - 존재 확인(비밀 미접근): `security find-generic-password -a <acct> -s <svc>`. rc 0만 True다(137-156).
 - 쓰기: `security -i`에 stdin으로 한 줄을 넣는다. `add-generic-password -U -a "<acct>" -s "<svc>" -X <hex(utf8 value)>\n`. 따옴표 안의 `\`와 `"`는 이스케이프한다(96-104). 줄 길이가 4096-64를 넘으면 argv 폴백 `security add-generic-password -U -a <acct> -s <svc> -X <hex>`(45, 159-202).
 - 삭제: `security delete-generic-password -a <acct> -s <svc>`. rc 0과 44 모두 성공(205-225).
+- (2026-10-19 실측) 값에 비ASCII 바이트가 있으면 `find-generic-password -w` 가 원문이 아니라 **16진수**로 출력한다. claude-swap 도 stdout 을 그대로 쓰므로 같다. 토큰 JSON 은 ASCII 라 지금은 무관하지만, 비ASCII 값을 저장하게 되면 읽기 쪽 디코드가 필요하다.
 
 (a) Claude Code 라이브 OAuth 자격증명:
 - 기본 프로필: service `Claude Code-credentials`, account `$USER`(credentials.py:117).

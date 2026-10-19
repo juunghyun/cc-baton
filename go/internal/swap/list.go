@@ -75,8 +75,9 @@ type accountInfo struct {
 	alias                   string
 	active                  bool
 	creds                   string
-	unreadable              bool
+	unreadable, degraded    bool
 	disabled                bool
+	uuid                    string // sequence.json 에 저장된 계정 uuid. 소유권 확인에 쓴다
 }
 
 func (e Env) accountsInfo(s *sequence) []accountInfo {
@@ -90,12 +91,12 @@ func (e Env) accountsInfo(s *sequence) []accountInfo {
 		k := strconv.Itoa(n)
 		a := s.Accounts[k]
 		ai := accountInfo{num: n, email: "unknown", orgName: str(a, "organizationName"), orgUUID: str(a, "organizationUuid"),
-			alias: str(a, "alias"), active: k == active, disabled: a["disabled"] == true}
+			alias: str(a, "alias"), active: k == active, disabled: a["disabled"] == true, uuid: str(a, "uuid")}
 		if v, ok := a["email"].(string); ok {
 			ai.email = v
 		}
 		if ai.active {
-			ai.creds, ai.unreadable = e.readActive()
+			ai.creds, ai.unreadable, ai.degraded = e.readActive()
 		} else {
 			ai.creds, ai.unreadable = e.readBackup(k, ai.email)
 		}
@@ -287,8 +288,8 @@ func (e Env) StatusJSON() (map[string]any, error) {
 	}
 	a := s.Accounts[k]
 	n, _ := strconv.Atoi(k)
-	i := accountInfo{num: n, email: email, orgUUID: str(a, "organizationUuid"), active: true}
-	i.creds, i.unreadable = e.readActive()
+	i := accountInfo{num: n, email: email, orgUUID: str(a, "organizationUuid"), active: true, uuid: str(a, "uuid")}
+	i.creds, i.unreadable, i.degraded = e.readActive()
 	st, entries := e.collectAll([]accountInfo{i})
 	active := map[string]any{"number": n, "email": email, "organizationName": str(a, "organizationName"),
 		"organizationUuid": i.orgUUID, "isOrganization": i.orgUUID != "", "managed": true}

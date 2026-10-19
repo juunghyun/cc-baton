@@ -286,7 +286,15 @@ func (e Env) fetchOne(i accountInfo) fetchRecord {
 		if tokenExpired(oauthData(i.creds)) {
 			return fetchRecord{sentinel: "token expired"}
 		}
-		return use(i.creds)
+		r := use(i.creds)
+		if r.err == "" && r.usage != nil && !i.degraded {
+			e.resyncRotatedBackup(i)
+		}
+		// 소유권 확인에서 다른 계정 토큰으로 밝혀졌으면 그 사용량은 이 슬롯 것이 아니다
+		if v, known := verdictOf(i, fingerprint(i.creds)); known && !v && r.err == "" && r.usage != nil {
+			return fetchRecord{sentinel: "foreign credential"}
+		}
+		return r
 	}
 	n := strconv.Itoa(i.num)
 	dir := e.sessionDir(n, i.email)
@@ -352,7 +360,7 @@ func (e Env) collect(infos []accountInfo, st map[string]string, ids map[string][
 			plans[n] = planAfterFetch(pre[n], r.usage, byNum[n].active, nowS(), rand.Float64)
 		}
 		if r.sentinel != "" {
-			st[n] = "token_expired" // fetchOne 이 내는 센티널은 이것 하나다
+			st[n] = strings.ReplaceAll(r.sentinel, " ", "_") // "token expired" → token_expired, "foreign credential" → foreign_credential
 		}
 	}
 	e.record(recs, ids, claims, plans)

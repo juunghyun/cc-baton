@@ -8,7 +8,7 @@
 
 | 트랙 | 범위 | 상태 |
 |---|---|---|
-| A. claude-swap → Go (`ccswap`) | cc-baton 이 쓰는 계정 기능 | 1단계(list/status 읽기) ✓ 실데이터 비교 · 3a(alias/map) ✓ 실데이터 · 3b(사용량 받기) ✓ 실데이터(2026-10-19: 차례 아닐 땐 안 받고, 차례에 Go 가 받아 기록, Python·statusline 이 그대로 읽고 다시 받지 않음, usage.json 외 변경 없음) · 3c(백업 맞추기) ✓ 코드·가짜 HOME, 실키체인 쓰기/읽기/삭제는 시험 항목으로 확인, 실데이터 테스트 대기 · 3d(run) ✓ 코드·가짜 HOME, 실제 바이너리 exec 확인 · 3e(add/add-token/remove) ✓ 코드·가짜 HOME · 3f 남음 |
+| A. claude-swap → Go (`ccswap`) | cc-baton 이 쓰는 계정 기능 | 1단계(list/status 읽기) ✓ 실데이터 비교 · 3a(alias/map) ✓ 실데이터 · 3b(사용량 받기) ✓ 실데이터(2026-10-19: 차례 아닐 땐 안 받고, 차례에 Go 가 받아 기록, Python·statusline 이 그대로 읽고 다시 받지 않음, usage.json 외 변경 없음) · 3c(백업 맞추기) ✓ 코드·가짜 HOME, 실키체인 쓰기/읽기/삭제는 시험 항목으로 확인, 실데이터 테스트 대기 · 3d(run) ✓ 코드·가짜 HOME, 실제 바이너리 exec 확인 · 3e(add/add-token/remove) ✓ 코드·가짜 HOME · 3f(쉬는 계정 갱신) ✓ 코드·가짜 HOME → **M1 코드 완료**. 남은 M1 조건: 설치 마법사 별칭 테스트를 Go cswap 으로 통과(M2 준비 때) |
 | B. cc-baton 본체 → Go | Python 3,462줄(11개 모듈), 테스트 73개 + e2e 설치 | 시작 전 |
 
 ## 마일스톤

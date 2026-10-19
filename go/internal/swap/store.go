@@ -185,6 +185,7 @@ type fetchRecord struct {
 	err        string // "" = 성공
 	retryAfter *float64
 	sentinel   string // "token expired" 등. 저장하지 않고 임대만 푼다
+	struckFP   string // invalid_grant 일 때 실제로 보낸 세대. 격리는 이 세대에만 묶인다
 }
 
 // record 는 임대 id 가 그대로인 행에만 결과를 반영한다. 그사이 다른 수집기가 가져갔으면 무시한다.
@@ -223,6 +224,18 @@ func (e Env) record(recs map[string]fetchRecord, ids map[string][2]string, claim
 				row["last429At"] = now
 			}
 			row["backoffUntil"] = now + failureBackoff(fails, rec.retryAfter, rec.err == "http-429")
+			if rec.err == "invalid_grant" || rec.err == "no_refresh_token" { // 이 둘만 격리 사유다. 429·타임아웃은 근거가 못 된다
+				strikes := 1
+				if s := num(row["authDeadStrikes"]); s != nil {
+					strikes = int(*s) + 1
+				}
+				row["authDeadStrikes"] = strikes
+				if rec.struckFP != "" {
+					row["struckFingerprint"] = rec.struckFP
+				} else {
+					row["struckFingerprint"] = nil
+				}
+			}
 		}
 		return changed
 	})

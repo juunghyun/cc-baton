@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -275,8 +276,7 @@ func pidAlive(pid int) bool {
 	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
-// fetchOne 은 한 계정의 사용량을 받는다. 토큰은 갱신하지 않는다.
-// shortcut: 만료·401 이면 갱신 대신 미룬다(기본 로그인은 Claude Code 몫, 쉬는 계정은 3f 에서 consume gate 로 추가).
+// fetchOne 은 한 계정의 사용량을 받는다. 기본 로그인 계정 토큰은 갱신하지 않는다(Claude Code 몫, spec R5).
 func (e Env) fetchOne(i accountInfo) fetchRecord {
 	use := func(creds string) fetchRecord {
 		u, kind, ra := getUsage(accessToken(creds))
@@ -311,10 +311,51 @@ func (e Env) fetchOne(i accountInfo) fetchRecord {
 			return fetchRecord{sentinel: "token expired"}
 		}
 	}
-	if o := oauthData(i.creds); live == 0 && o["refreshToken"] != nil && o["refreshToken"] != "" && tokenExpired(o) {
-		return fetchRecord{sentinel: "token expired"}
+	if live > 0 {
+		return use(i.creds) // claude 가 돌고 있으면 그쪽이 토큰 주인이다. 갱신하지 않는다
 	}
-	return use(i.creds)
+	return e.fetchIdleBackup(n, i)
+}
+
+var deterministic = []string{"store-unmirrored", "invalid_client", "consume-busy", "stash-unreadable"}
+
+// fetchIdleBackup 은 아무도 안 쓰는 계정의 백업으로 받는다. 만료됐거나 401 이면 consume gate 로 한 번 갱신한다
+// (oauth.try_fetch_usage_for_account, refresh_via=consume_backup_grant).
+func (e Env) fetchIdleBackup(n string, i accountInfo) fetchRecord {
+	working := i.creds
+	o := oauthData(working)
+	hasRT := str(o, "refreshToken") != ""
+	dead := func(err string) bool { return err == "invalid_grant" || err == "no_refresh_token" }
+	if hasRT && tokenExpired(o) {
+		r := e.consumeBackupGrant(n, i.email, working)
+		switch {
+		case r.creds != "":
+			working = r.creds
+		case dead(r.err):
+			return fetchRecord{err: r.err, struckFP: orDefault(r.consumedFP, fingerprint(working))}
+		case slices.Contains(deterministic, r.err):
+			return fetchRecord{err: r.err}
+		}
+	}
+	u, kind, ra := getUsage(accessToken(working))
+	if kind != "http-401" || !hasRT {
+		return fetchRecord{usage: u, err: kind, retryAfter: ra}
+	}
+	r := e.consumeBackupGrant(n, i.email, working)
+	if r.creds == "" {
+		switch {
+		case dead(r.err):
+			return fetchRecord{err: r.err, struckFP: orDefault(r.consumedFP, fingerprint(working))}
+		case slices.Contains(deterministic, r.err):
+			return fetchRecord{err: r.err}
+		}
+		return fetchRecord{err: "refresh-failed"}
+	}
+	if accessToken(r.creds) == "" {
+		return fetchRecord{err: "refresh-failed"}
+	}
+	u, kind, ra = getUsage(accessToken(r.creds))
+	return fetchRecord{usage: u, err: kind, retryAfter: ra}
 }
 
 // collect 는 받을 차례인 계정만 임대를 걸고, 0.25초씩 띄워 동시에 받고, 결과를 기록한다(_collect_usage_entries).

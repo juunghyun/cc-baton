@@ -153,7 +153,15 @@ func (e Env) collectAll(infos []accountInfo) (map[string]string, map[string]entr
 		entries = e.usageEntries(ids)
 	}
 	e.collect(infos, st, ids, entries)
-	return st, e.usageEntries(ids)
+	entries = e.usageEntries(ids)
+	// 이번에 받은 결과가 invalid_grant 였으면 다음 수집까지 기다리지 않고 바로 "다시 로그인 필요"로 보인다
+	for _, i := range infos {
+		n := strconv.Itoa(i.num)
+		if st[n] == "" && e.tokenDead(entries[n], i) {
+			st[n] = "relogin_required"
+		}
+	}
+	return st, entries
 }
 
 // tokenDead: 활성 계정은 라이브와 백업 두 곳 중 하나라도 죽은 세대를 들고 있으면 죽은 것으로 본다.

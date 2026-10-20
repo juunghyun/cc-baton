@@ -24,7 +24,9 @@ USAGE_PATH = BACKUP / "cache" / "usage.json"
 SESSIONS_DIR = BACKUP / "sessions"
 # cc-baton 과 함께 설치된 claude-swap 을 쓴다 (테스트한 버전으로 고정). 없으면 따로 깔린 것.
 _BUNDLED_CSWAP = Path(sys.executable).parent / "cswap"
-CSWAP_BIN = _BUNDLED_CSWAP if _BUNDLED_CSWAP.exists() else Path.home() / ".local" / "bin" / "cswap"
+# CC_BATON_CSWAP: 다른 cswap(예: Go 판)을 이 탭에서만 써 볼 때.
+CSWAP_BIN = (Path(os.environ["CC_BATON_CSWAP"]) if os.environ.get("CC_BATON_CSWAP")
+             else _BUNDLED_CSWAP if _BUNDLED_CSWAP.exists() else Path.home() / ".local" / "bin" / "cswap")
 _STATE_ROOT = Path(os.environ.get("XDG_STATE_HOME") or (Path.home() / ".local" / "state"))
 STATE_DIR = _STATE_ROOT / "cc-baton"
 # 0.1 이전 상태 폴더 → 새 위치. install 이 옮기고 옛 경로에 링크를 남긴다 (옛 셸 함수를 든 탭용).

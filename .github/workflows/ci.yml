@@ -17,6 +17,23 @@ jobs:
       - name: Tests
         run: uv run --python 3.12 --group dev python -m pytest tests -q
 
+  # Go 판 cswap: 자체 테스트 + 같은 Python 테스트를 Go cswap 으로 한 번 더(두 쪽이 맞물리는 곳이 깨지면 여기서 보인다).
+  go:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+      - name: Go tests
+        working-directory: go
+        run: go vet ./... && go test ./...
+      - uses: astral-sh/setup-uv@v6
+      - name: Python tests with the Go cswap
+        run: |
+          (cd go && go build -o "$RUNNER_TEMP/ccswap" ./cmd/ccswap)
+          CC_BATON_CSWAP="$RUNNER_TEMP/ccswap" uv run --python 3.12 --group dev python -m pytest tests -q
+
   # 새 Mac 사용자처럼: README 설치 → 첫 실행 위저드 → HUD → 제거. PATH 는 macOS 기본값만 (Homebrew 도구 없이).
   install:
     runs-on: macos-latest

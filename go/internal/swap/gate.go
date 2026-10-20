@@ -19,7 +19,8 @@ import (
 
 var tokenURL = "https://platform.claude.com/v1/oauth/token" // 테스트가 가짜 서버로 바꾼다
 
-const oauthClientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+// Claude Code 의 공개 OAuth client ID(비밀값 아님, claude-swap oauth.py:18 과 같다).
+const oauthClientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e" // gitleaks:allow
 
 // 보관본을 읽을 수 없으면 그 안에 다음 세대가 있을 수 있으니, 지금 백업을 보내지 않고 미룬다.
 var errStashUnreadable = errors.New("stash unreadable")

@@ -1,0 +1,2 @@
+# Claude Code's public OAuth client ID, not a secret (same value as claude-swap oauth.py:18). Later commits carry gitleaks:allow on the line.
+64858dc78048194522d8847e22a170a5f8eec4be:go/internal/swap/gate.go:generic-api-key:22

@@ -21,6 +21,7 @@
 - 완료 조건: 단계마다 가짜 HOME 테스트 + 일부러 망가뜨리기 검사 통과(키체인 쓰기가 있는 단계는 시험 항목으로 실키체인 확인). 단계별 실데이터 테스트는 하지 않고 M2 직전 일괄 실테스트로 모은다(2026-10-19 결정). Python 테스트 중 cswap 을 실제로 부르는 건 설치 마법사 별칭 테스트(`test_install.py:173`) 하나라, 그건 Go cswap 으로 바꿔 끼워 통과시키고 나머지 호환은 실데이터 `run`·`add` 로 확인한다.
 
 ### M2. baton 이 Go cswap 을 쓰도록 전환
+- 2026-10-20 실계정 일괄 테스트(안전한 부분) 통과: list/status 가 Python 과 같음, `run 1`(이 대화가 쓰는 살아 있는 프로필)이 프로필을 바꾸지 않고 재사용, `run 2` 기본 로그인 직행, `add-token`→`remove` 를 Python 이 그대로 읽고 흔적 없이 지움(키체인 항목 집합 불변, sequence.json 은 lastUpdated 만). 3c 는 M2 검증 중 로그(`[go] Resynced`)로, 3f 는 `~/cc-baton-3f-check.sh`(1번 탭을 다 닫고 백업 만료 뒤 실행)로 확인한다.
 - 전환 직전 일괄 실테스트: 파일 백업 → 체크리스트대로 3c~3f 를 실계정에서 확인(3c 처럼 자연히 안 생기는 상황은 `usageRefresh` 를 잠깐 꺼서 만든다) → 통과하면 전환.
 - 바꾸는 곳: `state.CSWAP_BIN` 한 곳(statusline·pick·baton.zsh·설치 마법사가 모두 이걸 통한다). Python claude-swap 은 지우지 않고 남겨 둔다.
 - 되돌리기: 그 한 줄을 되돌린다.

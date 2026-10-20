@@ -113,6 +113,8 @@ class Home:
             "COLUMNS": "140",
             "PYTHONPATH": str(ROOT),
         }
+        if os.environ.get("CC_BATON_CSWAP"):  # 같은 테스트를 다른 cswap(Go 판)으로 돌릴 때
+            e["CC_BATON_CSWAP"] = os.environ["CC_BATON_CSWAP"]
         e.update({k: str(v) for k, v in extra.items()})
         return e
 

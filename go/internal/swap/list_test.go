@@ -224,6 +224,30 @@ func TestDeadTokenStrikeBindsToItsGeneration(t *testing.T) {
 	}
 }
 
+func TestStruckBackupIsNotQuarantinedWhileItsProfileIsAlive(t *testing.T) {
+	for profExp, alive := range map[int64]bool{later: true, time.Now().UnixMilli(): false} {
+		h := newHome(t)
+		h.twoAccounts()
+		api := h.api(ok200)
+		dir := h.env.sessionDir("1", "a@gmail.com")
+		must(t, os.MkdirAll(dir, 0o700))
+		h.keychain(sessionService(dir), h.user, creds("prof", "rt-p", profExp))
+		h.json(".claude-swap-backup/cache/usage.json", map[string]any{"schemaVersion": 2, "accounts": map[string]any{
+			"1": usageRow("a@gmail.com", "", 1000, map[string]any{"authDeadStrikes": 1, "struckFingerprint": fingerprint(creds("bk", "rt-1", later))})}})
+		p, _ := h.env.ListJSON()
+		s := accountsByNum(t, p)[1]["usageStatus"]
+		if alive && (s == "relogin_required" || !contains(api.tokens, "prof")) {
+			t.Fatalf("프로필이 살아 있는데 격리됨: %v %v", s, api.tokens)
+		}
+		if !alive && s != "relogin_required" {
+			t.Fatalf("프로필도 만료됐는데 격리가 풀림: %v", s)
+		}
+		if contains(api.tokens, "bk") {
+			t.Fatalf("죽은 백업을 보냄: %v", api.tokens)
+		}
+	}
+}
+
 func TestExpiredActiveTokenIsTokenExpired(t *testing.T) {
 	h := newHome(t)
 	h.twoAccounts()

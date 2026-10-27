@@ -8,7 +8,7 @@
 
 | 트랙 | 범위 | 상태 |
 |---|---|---|
-| A. claude-swap → Go (`ccswap`) | cc-baton 이 쓰는 계정 기능 | 1단계(list/status 읽기) ✓ 실데이터 비교 · 3a(alias/map) ✓ 실데이터 · 3b(사용량 받기) ✓ 실데이터(2026-10-19: 차례 아닐 땐 안 받고, 차례에 Go 가 받아 기록, Python·statusline 이 그대로 읽고 다시 받지 않음, usage.json 외 변경 없음) · 3c(백업 맞추기) ✓ 코드·가짜 HOME, 실키체인 쓰기/읽기/삭제는 시험 항목으로 확인, 실데이터 테스트 대기 · 3d(run) ✓ 코드·가짜 HOME, 실제 바이너리 exec 확인 · 3e(add/add-token/remove) ✓ 코드·가짜 HOME · 3f(쉬는 계정 갱신) ✓ 코드·가짜 HOME → **M1 완료**(2026-10-20: Python 테스트 82개가 `CC_BATON_CSWAP=<Go>` 로도 통과, 설치 마법사 별칭 단계가 실제로 Go 를 거침. CI `go` 작업이 Go 테스트와 이 교차 실행을 매 PR 마다 돌린다) |
+| A. claude-swap → Go (`ccswap`) | cc-baton 이 쓰는 계정 기능 | 1단계(list/status 읽기) ✓ 실데이터 비교 · 3a(alias/map) ✓ 실데이터 · 3b(사용량 받기) ✓ 실데이터(2026-10-19: 차례 아닐 땐 안 받고, 차례에 Go 가 받아 기록, Python·statusline 이 그대로 읽고 다시 받지 않음, usage.json 외 변경 없음) · 3c(백업 맞추기) ✓ 코드·가짜 HOME, 실키체인 쓰기/읽기/삭제는 시험 항목으로 확인, 실데이터 테스트 대기 · 3d(run) ✓ 코드·가짜 HOME, 실제 바이너리 exec 확인 · 3e(add/add-token/remove) ✓ 코드·가짜 HOME · 3f(쉬는 계정 갱신) ✓ 코드·가짜 HOME → **M1 완료**(2026-10-20: Python 테스트 82개가 `CC_BATON_CSWAP=<Go>` 로도 통과, 설치 마법사 별칭 단계가 실제로 Go 를 거침. CI `go` 작업이 Go 테스트와 이 교차 실행을 매 PR 마다 돌린다) · 쉬는 계정 격리 판정 수정(2026-10-27: 세션 프로필에 다른 세대의 살아 있는 토큰이 있으면 격리하지 않음. 0.26.0 을 그대로 옮긴 판정 때문에 personal 이 10-21~27 격리된 채 굳은 것을 고침) |
 | B. cc-baton 본체 → Go | Python 3,462줄(11개 모듈), 테스트 73개 + e2e 설치 | 시작 전 |
 
 ## 마일스톤
@@ -23,9 +23,12 @@
 ### M2. baton 이 Go cswap 을 쓰도록 전환
 - 2026-10-20 실계정 일괄 테스트(안전한 부분) 통과: list/status 가 Python 과 같음, `run 1`(이 대화가 쓰는 살아 있는 프로필)이 프로필을 바꾸지 않고 재사용, `run 2` 기본 로그인 직행, `add-token`→`remove` 를 Python 이 그대로 읽고 흔적 없이 지움(키체인 항목 집합 불변, sequence.json 은 lastUpdated 만). 3c 는 M2 검증 중 로그(`[go] Resynced`)로, 3f 는 `~/cc-baton-3f-check.sh`(1번 탭을 다 닫고 백업 만료 뒤 실행)로 확인한다.
 - 전환 직전 일괄 실테스트: 파일 백업 → 체크리스트대로 3c~3f 를 실계정에서 확인(3c 처럼 자연히 안 생기는 상황은 `usageRefresh` 를 잠깐 꺼서 만든다) → 통과하면 전환.
+- **2026-10-27 전환 보류.** 3f 실계정 확인은 1번 계정 탭을 모두 닫아야 하는데, 그럴 수 없다(사용자). 확인 방법을 정할 때까지 Python cswap 을 그대로 쓴다. 이때 함께 드러난 것:
+  - 살아 있는 세션 판정이 세션 기록(`sessions/*.json`)만 본다(Python·Go 모두). 10-26 Python 이 프로필 폴더를 지울 때 기록이 같이 지워진 세션(pid 91332)은 계속 돌고 있는데 cswap 에도 재우기(hib)에도 안 보인다. 3f 를 켜기 전에 실제 프로세스(`CLAUDE_CONFIG_DIR`)도 보게 해야 한다.
+  - 아래 완료 조건의 `invalid_grant` 로그 기준은 Python 이 만료 토큰 갱신의 `invalid_grant` 를 로그에 남기지 않아서 놓친다(10-21 격리는 로그 0줄). `usage.json` 의 `authDeadStrikes` 로 본다.
 - 바꾸는 곳: `state.CSWAP_BIN` 한 곳(statusline·pick·baton.zsh·설치 마법사가 모두 이걸 통한다). Python claude-swap 은 지우지 않고 남겨 둔다.
 - 되돌리기: 그 한 줄을 되돌린다.
-- 완료 조건: 7일 실사용 동안 로그아웃 0회, `claude-swap.log` 에 `invalid_grant` 0건, 사용량 갱신 정상, run·swap·재우기 정상. 이 기간 Python cswap 실행 기록 없음.
+- 완료 조건: 7일 실사용 동안 로그아웃 0회, `usage.json` 의 `authDeadStrikes` 0(격리 0건), 사용량 갱신 정상, run·swap·재우기 정상. 이 기간 Python cswap 실행 기록 없음.
 
 ### M3. claude-swap 의존성 제거
 - `pyproject.toml` 에서 `claude-swap` 제거, 설치가 번들 cswap 대신 Go 바이너리를 `cswap` 으로 링크.

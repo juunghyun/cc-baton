@@ -167,7 +167,7 @@ func (e Env) collectAll(infos []accountInfo) (map[string]string, map[string]entr
 // tokenDead: 활성 계정은 라이브와 백업 두 곳 중 하나라도 죽은 세대를 들고 있으면 죽은 것으로 본다.
 func (e Env) tokenDead(en entry, i accountInfo) bool {
 	if en.tokenDead(fingerprint(i.creds)) {
-		return true
+		return i.active || !e.profileAlive(en, i)
 	}
 	if !i.active {
 		return false
@@ -177,6 +177,16 @@ func (e Env) tokenDead(en entry, i accountInfo) bool {
 		return en.tokenDead("")
 	}
 	return backup != "" && en.tokenDead(fingerprint(backup))
+}
+
+// profileAlive: 쉬는 계정의 세션 프로필이 격리된 세대가 아닌 살아 있는 토큰을 들고 있는가. 그러면 fetchOne 은 그 토큰으로
+// 읽기만 하고 죽은 백업은 보내지 않는다. 0.26.0 은 백업만 봐서 세션으로만 쓰는 계정이 격리된 채 굳었다(2026-10-21).
+func (e Env) profileAlive(en entry, i accountInfo) bool {
+	dir := e.sessionDir(strconv.Itoa(i.num), i.email)
+	prof := sessionCreds(dir)
+	o := oauthData(prof)
+	return o != nil && accessToken(prof) != "" && !tokenExpired(o) && fingerprint(prof) != en.struckFP &&
+		!sessionDrifted(dir, i.email, i.orgUUID)
 }
 
 func isoZ(ts float64) string {

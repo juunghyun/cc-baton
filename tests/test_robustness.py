@@ -89,3 +89,17 @@ def test_parked_sessions_without_a_transcript_are_hidden_then_cleaned(home):
     assert "결정 기준" in out and "workspace-2" not in out
     home.run("hib", "clean")
     assert (parked / f"{SID_A}.json").exists() and not (parked / f"{gone}.json").exists()
+
+
+def test_typing_without_sending_keeps_the_session_awake(home):
+    home.fake("ps", 'echo "4242 ttys009 300000 /usr/local/bin/claude"')
+    home.fake("memory_pressure", "exit 0")
+    home.write_json(f"{TEAM_PROFILE}/sessions/4242.json", {
+        "pid": 4242, "sessionId": SID_A, "status": "idle", "kind": "interactive", "name": "w",
+        "cwd": str(home.root), "statusUpdatedAt": (time.time() - 3 * 3600) * 1000})
+    home.transcript(TEAM_PROFILE, SID_A)
+    assert "유휴 0분 <" not in plain(home.run("hib", "scan").stdout)
+    draft = home.state / "drafts" / f"{SID_A}.txt"
+    draft.parent.mkdir(parents=True)
+    draft.write_text("쓰다 만 질문")  # mods/draft 가 입력창 편집마다 남기는 파일
+    assert "유휴 0분 <" in plain(home.run("hib", "scan").stdout)

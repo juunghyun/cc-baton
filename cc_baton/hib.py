@@ -312,11 +312,16 @@ def sessions():
                 continue                                   # pid 재사용
             sid = d.get("sessionId")
             hits = sorted((prof / "projects").glob(f"*/{sid}.jsonl"))
+            # status 는 제출해야 바뀐다. 입력창에 쓰는 중이면 mods/draft 가 편집마다 갱신하는 초안 파일 시각으로 본다.
+            try:
+                typed = (st.STATE_DIR / "drafts" / f"{sid}.txt").stat().st_mtime
+            except OSError:
+                typed = 0
             rows.append({
                 "pid": pid, "sid": sid, "profile": str(prof), "account": account_of(prof),
                 "name": d.get("name"), "cwd": d.get("cwd"), "status": d.get("status"),
                 "kind": d.get("kind"), "tty": lp[pid]["tty"], "rss": lp[pid]["rss"],
-                "idle_min": (now - (d.get("statusUpdatedAt") or 0) / 1000) / 60,
+                "idle_min": (now - max((d.get("statusUpdatedAt") or 0) / 1000, typed)) / 60,
                 "transcript": str(hits[0]) if hits else None,
                 "regfile": str(f),
             })

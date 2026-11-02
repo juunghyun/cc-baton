@@ -340,9 +340,8 @@ def main():
             if fable:
                 mark = "⚠" if (st.number(fable.get("pct")) or 0) >= 100 else ""
                 seg.append(window("Fable", fable, show_reset=False) + mark)
-            if age is not None and age > STALE_MARK:
-                seg[0] = f"{DIM}~{R}" + seg[0]
-                seg[-1] += f" {DIM}(" + L(f"{age / 60:.0f}m ago", f"{age / 60:.0f}m전") + f"){R}"
+            if age is not None and age > STALE_MARK:  # 맨 앞에: 끝에 붙이면 Fable 값의 나이로 읽힌다
+                seg.insert(0, DIM + L(f"{st.duration(age)} old", f"{st.duration(age)}전 값") + R)
         else:
             seg = [f"{DIM}5h — │ 1w — ({st.usage_note(num)}){R}"]
 

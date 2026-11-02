@@ -237,7 +237,12 @@ def countdown(resets_at):
         return ""
     if delta <= 0:
         return L("soon", "곧")
-    d, rem = divmod(int(delta), 86400)
+    return duration(delta)
+
+
+def duration(sec):
+    """초 → '2d1h' / '3h27m' / '12m'."""
+    d, rem = divmod(int(sec), 86400)
     h, rem = divmod(rem, 3600)
     m = rem // 60
     if d:

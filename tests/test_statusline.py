@@ -136,6 +136,14 @@ def test_missing_usage_values_do_not_break_hud(home):
     assert "5h —" in row2 and "team —/9%" in row2
 
 
+def test_stale_usage_age_leads_the_row(home):
+    path = home.backup / "cache/usage.json"
+    data = json.loads(path.read_text())
+    data["accounts"]["1"]["fetchedAt"] = time.time() - (6 * 86400 + 8 * 3600 + 120)
+    path.write_text(json.dumps(data))
+    assert plain(render(home, "high")[1]).startswith("6d8h전 값 │ 5h")
+
+
 def test_hibernate_shows_threshold_actually_used(home):
     (home.state / "hib").mkdir(parents=True)
     (home.state / "hib/threshold.json").write_text(json.dumps({"idleMin": 30, "why": "memory", "at": time.time()}))

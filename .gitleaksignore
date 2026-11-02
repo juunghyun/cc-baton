@@ -1,2 +1,4 @@
 # Claude Code 의 공개 OAuth client ID (claude-swap oauth.py 에도 있는 값, 비밀 아님)
+efd2705648576f058d2cf2f0c8f9cbb113ef80c9:go/internal/swap/gate.go:generic-api-key:22
+# 같은 줄의 이력 정리 전 커밋. feature/go-port 를 다시 쓰는 동안만 필요하다
 64858dc78048194522d8847e22a170a5f8eec4be:go/internal/swap/gate.go:generic-api-key:22

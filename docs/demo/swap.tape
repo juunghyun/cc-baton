@@ -3,7 +3,8 @@
 # 이메일이 찍히는 claude-swap 실행 줄은 Hide 구간(시작, Ctrl+D 두 번 뒤 재실행)에만 나온다. 녹화 후 프레임을 반드시 확인.
 # 레벨 칩·권한 우회 같은 개인 설정은 빼고 찍는다: 설정 사본(levelChip·skipPermissions 끔)을 <dir>/cc-baton/config.json 에 두고 DEMO_XDG=<dir>.
 # 실행: env -i HOME="$HOME" USER="$USER" SHELL=/bin/zsh TERM=xterm-256color LANG=en_US.UTF-8 PATH="$PATH" DEMO_XDG=<dir> vhs docs/demo/swap.tape
-Output "docs/demo-swap.gif"
+# 그다음 python3 docs/demo/edit_swap.py 로 빨리 감기·HUD 확대·강조를 넣어 docs/demo-swap.gif 를 만든다 (시각·좌표 다시 잴 것).
+Output "docs/demo/swap-raw.gif"
 Set Shell zsh
 Set FontSize 14
 Set Width 1280

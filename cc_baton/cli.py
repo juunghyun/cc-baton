@@ -76,7 +76,10 @@ def main(argv=None):
         env = {**os.environ, "CC_BATON_PY": sys.executable, "CC_BATON_LANG": lang()}
         return subprocess.call(["/bin/bash", str(Path(__file__).with_name("claude_update.sh")), *rest], env=env)
     if sub == "cswap":
-        from .state import CSWAP_BIN
+        from .state import _BUNDLED_CSWAP, CSWAP_BIN
+        if rest[:1] == ["run"] and CSWAP_BIN == _BUNDLED_CSWAP:  # 번들 claude-swap 일 때만 같은 프로세스에서
+            from . import cswap
+            return cswap.run(rest)
         try:
             os.execv(str(CSWAP_BIN), ["cswap", *rest])
         except OSError:

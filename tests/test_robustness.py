@@ -103,3 +103,16 @@ def test_typing_without_sending_keeps_the_session_awake(home):
     draft.parent.mkdir(parents=True)
     draft.write_text("쓰다 만 질문")  # mods/draft 가 입력창 편집마다 남기는 파일
     assert "유휴 0분 <" in plain(home.run("hib", "scan").stdout)
+
+
+def test_failed_cswap_validation_keeps_conversation_history(home, monkeypatch):
+    from claude_swap import session
+
+    from cc_baton.cswap import keep_projects
+    monkeypatch.setattr(session, "delete_macos_keychain_entry", lambda d: None)  # 진짜 키체인은 건드리지 않는다
+    prof = home.root / TEAM_PROFILE
+    t = home.transcript(TEAM_PROFILE, SID_A)
+    (prof / ".credentials.json").write_text("{}")
+    (prof / "todos").mkdir()
+    keep_projects(session.SessionManager._cleanup_failed_session)(None, prof)
+    assert [p.name for p in prof.iterdir()] == ["projects"] and t.read_text() == '{"type":"user"}\n'

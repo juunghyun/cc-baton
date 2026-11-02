@@ -1,0 +1,2 @@
+# Claude Code 의 공개 OAuth client ID (claude-swap oauth.py 에도 있는 값, 비밀 아님)
+64858dc78048194522d8847e22a170a5f8eec4be:go/internal/swap/gate.go:generic-api-key:22

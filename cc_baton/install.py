@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import time
+from importlib.metadata import version
 from pathlib import Path
 
 from . import i18n
@@ -705,7 +706,7 @@ def cmd_uninstall(argv):
         link.unlink()
         if ask(L("Keep using claude-swap (cswap)? It will be installed on its own.",
                  "claude-swap(cswap) 은 계속 쓰시겠어요? 따로 다시 설치해 둡니다."), True):
-            ok = subprocess.run(["uv", "tool", "install", "claude-swap==0.26.0"], capture_output=True).returncode == 0
+            ok = subprocess.run(["uv", "tool", "install", f"claude-swap=={version('claude-swap')}"], capture_output=True).returncode == 0  # 번들과 같은 버전으로
             report.append(L("cswap: installed on its own", "cswap: 따로 설치") if ok
                           else L("cswap: install failed (uv tool install claude-swap)", "cswap: 설치 실패 (uv tool install claude-swap)"))
         else:

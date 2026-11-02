@@ -15,23 +15,23 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "claude-swap", specifier = "==0.26.0" }]
+requires-dist = [{ name = "claude-swap", specifier = "==0.29.0" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8" }]
 
 [[package]]
 name = "claude-swap"
-version = "0.26.0"
+version = "0.29.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "keyring", marker = "sys_platform == 'win32'" },
     { name = "textual" },
     { name = "truststore" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/52/23/38c84a7813dcecdf7d2be292e031fbfcb8de2b6d36e7cb026019f0480001/claude_swap-0.26.0.tar.gz", hash = "sha256:f47f013ef6275f360a60000f5864f55697d62bb6b483100c4df7296e46a849d7", size = 751824, upload-time = "2026-09-02T18:29:38.802Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/25/d740a69ed9d6fed04e7f0f5051862d7e8f7e643b2cced66863ea2e051323/claude_swap-0.29.0.tar.gz", hash = "sha256:175932299b7f627b840ddce63dafc05aecc2d35d168792b4e9f2b94e192a3978", size = 885785, upload-time = "2026-10-28T07:09:36.183Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e4/42/19530bcfff72c8b5950a4b0de49baf2c1b147f2345ae404ccd5e18c603e7/claude_swap-0.26.0-py3-none-any.whl", hash = "sha256:0df6b2345888b8cded6473a8d2f0e39c51da20eaa450c70923b22d66a9502cfe", size = 340762, upload-time = "2026-09-02T18:29:37.432Z" },
+    { url = "https://files.pythonhosted.org/packages/61/49/dba2841144b892fc263153a644a8c44f1e0938733dcf4e27da00a32f856f/claude_swap-0.29.0-py3-none-any.whl", hash = "sha256:fb30342ea2aa365d706706d02a6c2b5dfe82765c0abaf9a2c4839a9a38450e9e", size = 389444, upload-time = "2026-10-28T07:09:34.134Z" },
 ]
 
 [[package]]

@@ -136,6 +136,15 @@ def test_missing_usage_values_do_not_break_hud(home):
     assert "5h —" in row2 and "team —/9%" in row2
 
 
+def test_account_without_five_hour_window_drops_the_cell(home):
+    path = home.backup / "cache/usage.json"
+    data = json.loads(path.read_text())
+    data["accounts"]["1"]["lastGood"].pop("five_hour")  # API 가 five_hour: null 을 보낸 계정
+    path.write_text(json.dumps(data))
+    row2 = plain(render(home, "high")[1])
+    assert row2.startswith("1w ") and "5h" not in row2
+
+
 def test_stale_usage_age_leads_the_row(home):
     path = home.backup / "cache/usage.json"
     data = json.loads(path.read_text())

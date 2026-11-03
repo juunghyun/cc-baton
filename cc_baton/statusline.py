@@ -335,7 +335,8 @@ def main():
         maybe_refresh(age)
 
         if good:
-            seg = [window("5h", good.get("five_hour")), window("1w", good.get("seven_day"))]
+            # 측정은 됐는데 five_hour 가 없으면 API 가 이 계정에 5h 한도를 안 보낸 것(limits 에도 없음) → "5h —" 대신 칸을 뺀다
+            seg = ([window("5h", good["five_hour"])] if "five_hour" in good else []) + [window("1w", good.get("seven_day"))]
             fable = st.scoped(good, "Fable")
             if fable:
                 mark = "⚠" if (st.number(fable.get("pct")) or 0) >= 100 else ""

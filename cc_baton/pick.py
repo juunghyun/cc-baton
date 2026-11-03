@@ -117,7 +117,8 @@ def row(a, selected, is_default):
         note = f"{DIM}{st.usage_note(a['num'])}{R}"
     else:
         cd = st.countdown((g.get("seven_day") or {}).get("resets_at"))
-        note = f"{DIM}{cd}{R}" + (f"{DIM} ~{age / 60:.0f}m{R}" if age and age > STALE else "")
+        old = st.duration(age) if age and age > STALE else ""  # HUD 와 같은 표기: 분만 쓰면 일주일 묵은 값이 수천 분으로 나온다
+        note = f"{DIM}{cd}{R}" + (f"{DIM} " + L(f"({old} old)", f"({old}전 값)") + R if old else "")
     cursor = f"{BOLD}❯{R}" if selected else " "
     mark = f"{DIM}·{R}" if is_default and not selected else " "
     name = f"{REV}{kc}{pad(a['label'], 12)}{R}" if selected else f"{kc}{pad(a['label'], 12)}{R}"

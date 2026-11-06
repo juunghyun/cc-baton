@@ -1,8 +1,9 @@
 """QA 검토에서 재현된 고장이 다시 생기지 않는지."""
 import json
+import subprocess
 import time
 
-from conftest import TEAM_PROFILE, plain
+from conftest import ROOT, TEAM_PROFILE, plain
 
 EXE = "/opt/cc-baton/bin/cc-baton"
 SID_A = "aaaaaaaa-0000-0000-0000-000000000000"
@@ -103,6 +104,45 @@ def test_typing_without_sending_keeps_the_session_awake(home):
     draft.parent.mkdir(parents=True)
     draft.write_text("쓰다 만 질문")  # mods/draft 가 입력창 편집마다 남기는 파일
     assert "유휴 0분 <" in plain(home.run("hib", "scan").stdout)
+
+
+def test_woken_session_gets_its_name_back(home):
+    pid = int(subprocess.check_output(["sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $!"]))  # 재우기가 진짜로 죽일 대상
+    # tty 는 없는 이름이어야 한다. 재우기가 /dev/<tty> 에 안내문을 쓰는데 가짜 HOME 으로는 /dev 가 격리되지 않는다.
+    home.fake("ps", f'case "$*" in *ppid*) echo 1 ;; *) echo "{pid} ttyNONE 300000 /usr/local/bin/claude" ;; esac')
+    home.write_json(f"{TEAM_PROFILE}/sessions/{pid}.json", {
+        "pid": pid, "sessionId": SID_A, "status": "idle", "kind": "interactive", "name": "workspace-c4",
+        "cwd": str(home.root), "statusUpdatedAt": time.time() * 1000})
+    home.transcript(TEAM_PROFILE, SID_A)
+    assert home.run("hib", "sleep", str(pid), "--force").returncode == 0
+    assert home.run("hib", "wake", SID_A).returncode == 0  # 마커는 여기서 지워진다
+    assert home.run("hib", "name", SID_A).stdout.strip() == "workspace-c4"
+
+
+def test_name_comes_from_the_snapshot_unless_a_live_session_holds_it(home):
+    home.write_json(".local/state/cc-baton/hib/live.json", {"sessions": {SID_A: {"name": "workspace-c4"}}})
+    assert home.run("hib", "name", SID_A).stdout.strip() == "workspace-c4"
+    home.fake("ps", 'echo "4242 ttyNONE 300000 /usr/local/bin/claude"')
+    home.write_json(f"{TEAM_PROFILE}/sessions/4242.json", {"pid": 4242, "sessionId": "other", "name": "workspace-c4"})
+    assert home.run("hib", "name", SID_A).stdout.strip() == ""
+
+
+def test_baton_passes_the_old_name_only_when_resuming(home):
+    log = home.root / "launched"
+    fake = home.root / "fake-baton"
+    fake.write_text(f"""#!/bin/sh
+case "$1 $2" in
+  "hib claim"|"toggle is-on") exit 1 ;;
+  "hib name") [ "$3" = "{SID_A}" ] && echo workspace-c4 ;;
+  "cswap run") echo "${{CLAUDE_CODE_SESSION_NAME-none}}" >> "{log}" ;;
+esac
+exit 0
+""")
+    fake.chmod(0o755)
+    runs = f"baton 1 -- --resume {SID_A}; baton 1 -- --resume unknown; baton 1"
+    subprocess.run(["/bin/zsh", "-fc", f'source "$0"; {runs}', str(ROOT / "cc_baton/data/baton.zsh")],
+                   env=home.env(CC_BATON_BIN=fake), cwd=home.root, timeout=20, check=True)
+    assert log.read_text().split() == ["workspace-c4", "none", "none"]
 
 
 def test_failed_cswap_validation_keeps_conversation_history(home, monkeypatch):

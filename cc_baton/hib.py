@@ -19,6 +19,7 @@ cc 래퍼가 이미 while 루프라 같은 탭에서 재실행할 수 있다. �
   claim               cc 래퍼가 호출. 내 tty 앞으로 온 재우기 요청을 소비
   banner <sid>        대기 화면 출력
   wake <sid>          parked 해제 (성공 시 exit 0)
+  name <sid>          세션이 쓰던 이름. cc 래퍼가 이어 띄울 때 넘긴다
   list                재운/복원 가능 세션
   restore [--script P] 여러 개를 한 번에 되살릴 때 쓸 명령 목록 (재부팅 후)
   resume <번호|ID>    그 자리에서 하나를 되살린다
@@ -144,6 +145,7 @@ def my_tty():
 
 
 LIVE = STATE / "live.json"          # 살아있는 세션 스냅샷 — 재부팅으로 끊긴 것을 알아내는 유일한 근거
+NAMES = STATE / "names"             # 재운 세션의 이름 — 마커는 claude 를 띄우기 전에 치워지니 따로 둔다
 LIVE_TTL_DAYS = 14
 
 
@@ -409,6 +411,7 @@ def do_sleep(row, reason, selfkill=False):
            "reason": reason, "rss": row["rss"]}
     _save(REQ / f"{row['tty']}.json", rec)
     _save(PARKED / f"{row['sid']}.json", rec)
+    _save(NAMES / f"{row['sid']}.json", row["name"])
     try:
         os.kill(row["pid"], 15)
     except ProcessLookupError:
@@ -743,6 +746,21 @@ def cmd_wake(argv):
     return 0
 
 
+def cmd_name(argv):
+    """이어 띄울 세션이 쓰던 이름. 재운 기록이 없으면(재부팅으로 끊김, 스왑) 스냅샷에서 찾는다.
+    다른 세션이 그 이름을 쓰고 있으면 비운다. claude 가 겹친 이름을 고치며 세션 제목까지 덮을 수 있다."""
+    sid = argv[0] if argv else ""
+    if not st.valid_sid(sid):
+        return 0
+    f = NAMES / f"{sid}.json"
+    name = _load(f) or (((_load(LIVE, {}) or {}).get("sessions") or {}).get(sid) or {}).get("name")
+    f.unlink(missing_ok=True)
+    if any(r["name"] == name and r["sid"] != sid for r in sessions()[0]):
+        name = None
+    print(st.clean(name))
+    return 0
+
+
 def parked_list():
     """재운 세션 + 재부팅 등으로 끊긴 세션. 후자는 레지스트리에 죽은 pid 로 남는다."""
     out = []
@@ -944,7 +962,7 @@ def main():
     for d in (REQ, PARKED, PENDING, CAP):
         d.mkdir(parents=True, exist_ok=True)
     cmds = {"scan": cmd_scan, "tick": cmd_tick, "sleep": cmd_sleep, "claim": cmd_claim,
-            "banner": cmd_banner, "wake": cmd_wake, "list": cmd_list, "pick": cmd_pick,
+            "banner": cmd_banner, "wake": cmd_wake, "name": cmd_name, "list": cmd_list, "pick": cmd_pick,
             "clean": cmd_clean, "cap": cmd_cap, "resume": cmd_resume, "restore": cmd_restore}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         print(L("usage: cc-baton hib scan | tick | sleep [target] [--all [min]] [--dry] [--force] | wake <sid> | list | "
